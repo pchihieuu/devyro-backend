@@ -7,11 +7,12 @@ import {
   BeforeInsert,
   BeforeUpdate,
   OneToMany,
+  OneToOne,
 } from "typeorm";
-import * as bcrypt from "bcryptjs";
 import { Job } from "./Job.entity";
 import { Application } from "./Application.entity";
 import { SavedJob } from "./SavedJob.entity";
+import { Company } from "./Company.entity";
 
 export enum UserRole {
   JOBSEEKER = "jobseeker",
@@ -85,16 +86,6 @@ export class User {
   @OneToMany(() => SavedJob, (savedJob) => savedJob.jobseeker)
   savedJobs: SavedJob[];
 
-  // Methods
-  @BeforeInsert()
-  @BeforeUpdate()
-  async hashPassword() {
-    if (this.password && !this.password.startsWith("$2a$")) {
-      this.password = await bcrypt.hash(this.password, 10);
-    }
-  }
-
-  async comparePassword(candidatePassword: string): Promise<boolean> {
-    return bcrypt.compare(candidatePassword, this.password);
-  }
+  @OneToOne(() => Company, (company) => company.employer)
+  company: Company;
 }

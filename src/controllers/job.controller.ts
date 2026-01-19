@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { jobService } from "../services/job.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { ForbiddenError } from "../utils/errors";
+import { ForbiddenError, NotFoundError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
 import { JobFilterQuery } from "../types/express";
@@ -12,13 +12,24 @@ export const createJob = asyncHandler(
       throw new ForbiddenError("Only employers can post jobs");
     }
 
-    const job = await jobService.createJob(req.user!.id, req.body);
+    try {
+      const job = await jobService.createJob(req.user!.id, req.body);
 
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: HTTP_MESSAGE.CREATED,
-      data: job,
-    });
+      res.status(HTTP_STATUS.CREATED).json({
+        success: true,
+        message: HTTP_MESSAGE.CREATED,
+        data: job,
+      });
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: "Please create a company profile before posting jobs",
+        });
+        return;
+      }
+      throw error;
+    }
   }
 );
 

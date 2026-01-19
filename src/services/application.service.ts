@@ -1,6 +1,7 @@
 import { AppDataSource } from "../config/database.config";
 import { Application, ApplicationStatus } from "../entities/Application.entity";
 import { Job } from "../entities/Job.entity";
+import { Company } from "../entities/Company.entity";
 import {
   NotFoundError,
   ForbiddenError,
@@ -10,7 +11,11 @@ import {
 export class ApplicationService {
   private applicationRepository = AppDataSource.getRepository(Application);
   private jobRepository = AppDataSource.getRepository(Job);
+  private companyRepository = AppDataSource.getRepository(Company);
 
+  /**
+   * Apply to a job
+   */
   async applyToJob(
     jobId: string,
     applicantId: string,
@@ -37,6 +42,9 @@ export class ApplicationService {
     return await this.applicationRepository.save(application);
   }
 
+  /**
+   * Get applicant's applications
+   */
   async getMyApplications(applicantId: string): Promise<Application[]> {
     return await this.applicationRepository.find({
       where: { applicantId },
@@ -54,20 +62,24 @@ export class ApplicationService {
     });
   }
 
+  /**
+   * Get applicants for a specific job (Employer only)
+   */
   async getApplicantsForJob(
     jobId: string,
     employerId: string
   ): Promise<Application[]> {
-    // Verify job exists and belongs to employer
+    // Verify job exists
     const job = await this.jobRepository.findOne({
       where: { id: jobId },
+      relations: ["company"],
     });
 
     if (!job) {
       throw new NotFoundError("Job not found");
     }
 
-    if (job.companyId !== employerId) {
+    if (job.company.employerId !== employerId) {
       throw new ForbiddenError(
         "Not authorized to view applicants for this job"
       );
@@ -95,13 +107,16 @@ export class ApplicationService {
     });
   }
 
+  /**
+   * Get application by ID
+   */
   async getApplicationById(
     applicationId: string,
     userId: string
   ): Promise<Application> {
     const application = await this.applicationRepository.findOne({
       where: { id: applicationId },
-      relations: ["job", "applicant"],
+      relations: ["job", "job.company", "applicant"],
       select: {
         job: {
           id: true,
@@ -122,17 +137,19 @@ export class ApplicationService {
       throw new NotFoundError("Application not found");
     }
 
-    const isOwner =
-      application.applicantId === userId ||
-      application.job.companyId === userId;
+    const isApplicant = application.applicantId === userId;
+    const isEmployer = application.job.company.employerId === userId;
 
-    if (!isOwner) {
+    if (!isApplicant && !isEmployer) {
       throw new ForbiddenError("Not authorized to view this application");
     }
 
     return application;
   }
 
+  /**
+   * Update application status (Employer only)
+   */
   async updateApplicationStatus(
     applicationId: string,
     employerId: string,
@@ -140,14 +157,14 @@ export class ApplicationService {
   ): Promise<{ message: string; status: ApplicationStatus }> {
     const application = await this.applicationRepository.findOne({
       where: { id: applicationId },
-      relations: ["job"],
+      relations: ["job", "job.company"],
     });
 
     if (!application) {
       throw new NotFoundError("Application not found");
     }
 
-    if (application.job.companyId !== employerId) {
+    if (application.job.company.employerId !== employerId) {
       throw new ForbiddenError("Not authorized to update this application");
     }
 
