@@ -13,6 +13,7 @@ import {
   getApplicantsForJob,
   getApplicationById,
   updateStatus,
+  withdrawApplication,
 } from "../controllers/application.controller";
 import { ROUTES } from "../constants/routes";
 
@@ -48,5 +49,7 @@ router.put(
   validate(updateApplicationStatusSchema),
   updateStatus
 );
+
+router.delete(ROUTES.APPLICATIONS.WITH_DRAW, protect, withdrawApplication);
 
 export default router;

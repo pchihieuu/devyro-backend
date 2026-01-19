@@ -4,8 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  BeforeInsert,
-  BeforeUpdate,
+  DeleteDateColumn,
   OneToMany,
   OneToOne,
 } from "typeorm";
@@ -45,35 +44,13 @@ export class User {
   @Column({ type: "varchar", nullable: true })
   resume: string;
 
-  // Employer fields
-  @Column({ type: "varchar", nullable: true })
-  companyName: string;
-
-  @Column({ type: "text", nullable: true })
-  companyDescription: string;
-
-  @Column({ type: "varchar", nullable: true })
-  companyLogo: string;
-
-  @Column({ type: "varchar", nullable: true })
-  companySize: string;
-
-  @Column({ type: "varchar", nullable: true })
-  companyIndustry: string;
-
-  @Column({ type: "varchar", nullable: true })
-  companyAddress: string;
-
-  @Column({ type: "varchar", nullable: true })
-  companyWebsite: string;
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @CreateDateColumn()
+  @DeleteDateColumn()
   deletedAt: Date;
 
   // Relations

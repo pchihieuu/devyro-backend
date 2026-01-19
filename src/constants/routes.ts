@@ -29,6 +29,7 @@ export const ROUTES = {
     APPLY_JOB: "/apply/:jobId",
     UPDATE_STATUS: "/:id/status",
     JOB_APPLICATIONS: "/job/:jobId",
+    WITH_DRAW: "/:id/withdraw",
   },
   SAVED_JOBS: {
     BASE: "/saved-jobs",
