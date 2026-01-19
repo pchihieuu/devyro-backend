@@ -39,4 +39,10 @@ export const ROUTES = {
     BASE: "/analytics",
     OVERVIEW: "/overview",
   },
+  COMPANIES: {
+    BASE: "/companies",
+    BY_ID: "/:id",
+    MY: "/my",
+    JOBS: "/:id/jobs",
+  },
 };

@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/database.config";
 import { Job, JobType } from "../entities/Job.entity";
 import { SavedJob } from "../entities/SavedJob.entity";
 import { Application } from "../entities/Application.entity";
+import { Company } from "../entities/Company.entity";
 import { In, Like, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import { NotFoundError, ForbiddenError } from "../utils/errors";
 
@@ -26,14 +27,29 @@ export class JobService {
   private jobRepository = AppDataSource.getRepository(Job);
   private savedJobRepository = AppDataSource.getRepository(SavedJob);
   private applicationRepository = AppDataSource.getRepository(Application);
+  private companyRepository = AppDataSource.getRepository(Company);
 
   async createJob(userId: string, jobData: Partial<Job>): Promise<Job> {
-    const job = this.jobRepository.create({
-      ...jobData,
-      companyId: userId,
+    let company = await this.companyRepository.findOne({
+      where: { employerId: userId },
     });
 
-    return await this.jobRepository.save(job);
+    if (!company) {
+      throw new NotFoundError(
+        "Company profile not found. Please create a company profile first."
+      );
+    }
+
+    const job = this.jobRepository.create({
+      ...jobData,
+      companyId: company.id,
+    });
+
+    const savedJob = await this.jobRepository.save(job);
+
+    await this.updateCompanyStats(company.id);
+
+    return savedJob;
   }
 
   async getJobs(
@@ -81,13 +97,14 @@ export class JobService {
 
     const [jobs, total] = await this.jobRepository.findAndCount({
       where,
-      relations: ["company"],
+      relations: ["company", "company.employer"],
       select: {
         company: {
           id: true,
           name: true,
-          companyName: true,
-          companyLogo: true,
+          logo: true,
+          industry: true,
+          size: true,
         },
       },
       order: { [sortBy]: order },
@@ -133,10 +150,27 @@ export class JobService {
     const { page, limit, sortBy, order } = pagination;
     const skip = (page - 1) * limit;
 
+    const company = await this.companyRepository.findOne({
+      where: { employerId },
+    });
+
+    if (!company) {
+      return {
+        jobs: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
+    }
+
     const [jobs, total] = await this.jobRepository.findAndCount({
       where: {
-        companyId: employerId,
+        companyId: company.id,
       },
+      relations: ["company"],
       order: {
         [sortBy]: order,
       },
@@ -158,18 +192,19 @@ export class JobService {
   async getJobById(jobId: string, userId?: string): Promise<any> {
     const job = await this.jobRepository.findOne({
       where: { id: jobId },
-      relations: ["company"],
+      relations: ["company", "company.employer"],
       select: {
         company: {
           id: true,
           name: true,
-          companyName: true,
-          companyLogo: true,
-          companySize: true,
-          companyIndustry: true,
-          companyAddress: true,
-          companyWebsite: true,
-          companyDescription: true,
+          logo: true,
+          size: true,
+          industry: true,
+          address: true,
+          website: true,
+          description: true,
+          benefits: true,
+          foundedYear: true,
         },
       },
     });
@@ -212,13 +247,16 @@ export class JobService {
     userId: string,
     updates: Partial<Job>
   ): Promise<Job> {
-    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    const job = await this.jobRepository.findOne({
+      where: { id: jobId },
+      relations: ["company"],
+    });
 
     if (!job) {
       throw new NotFoundError("Job not found");
     }
 
-    if (job.companyId !== userId) {
+    if (job.company.employerId !== userId) {
       throw new ForbiddenError("Not authorized to update this job");
     }
 
@@ -227,35 +265,45 @@ export class JobService {
   }
 
   async deleteJob(jobId: string, userId: string): Promise<void> {
-    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    const job = await this.jobRepository.findOne({
+      where: { id: jobId },
+      relations: ["company"],
+    });
 
     if (!job) {
       throw new NotFoundError("Job not found");
     }
 
-    if (job.companyId !== userId) {
+    if (job.company.employerId !== userId) {
       throw new ForbiddenError("Not authorized to delete this job");
     }
 
     await this.jobRepository.softDelete(jobId);
+
+    await this.updateCompanyStats(job.companyId);
   }
 
   async toggleJobStatus(
     jobId: string,
     userId: string
   ): Promise<{ message: string; isClosed: boolean }> {
-    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    const job = await this.jobRepository.findOne({
+      where: { id: jobId },
+      relations: ["company"],
+    });
 
     if (!job) {
       throw new NotFoundError("Job not found");
     }
 
-    if (job.companyId !== userId) {
+    if (job.company.employerId !== userId) {
       throw new ForbiddenError("Not authorized to modify this job");
     }
 
     job.isClosed = !job.isClosed;
     await this.jobRepository.save(job);
+
+    await this.updateCompanyStats(job.companyId);
 
     return {
       message: job.isClosed
@@ -265,7 +313,6 @@ export class JobService {
     };
   }
 
-  // Helper methods
   private async getSavedJobIds(userId: string): Promise<string[]> {
     const savedJobs = await this.savedJobRepository.find({
       where: { jobseekerId: userId },
@@ -288,6 +335,21 @@ export class JobService {
     });
 
     return statusMap;
+  }
+
+  private async updateCompanyStats(companyId: string): Promise<void> {
+    const totalJobs = await this.jobRepository.count({
+      where: { companyId },
+    });
+
+    const activeJobs = await this.jobRepository.count({
+      where: { companyId, isClosed: false },
+    });
+
+    await this.companyRepository.update(companyId, {
+      totalJobs,
+      activeJobs,
+    });
   }
 }
 

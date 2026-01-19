@@ -9,9 +9,9 @@ import {
   OneToMany,
   DeleteDateColumn,
 } from "typeorm";
-import { User } from "./User.entity";
 import { Application } from "./Application.entity";
 import { SavedJob } from "./SavedJob.entity";
+import { Company } from "./Company.entity";
 
 export enum JobType {
   FULL_TIME = "Full-time",
@@ -63,15 +63,13 @@ export class Job {
 
   @UpdateDateColumn()
   updatedAt: Date;
-  
+
   @DeleteDateColumn({ nullable: true })
   deletedAt?: Date;
 
-  // Relations
-  @ManyToOne(() => User, (user) => user.jobs, { onDelete: "CASCADE" })
+  @ManyToOne(() => Company, (company) => company.jobs, { onDelete: "CASCADE" })
   @JoinColumn({ name: "companyId" })
-  company: User;
-
+  company: Company;
   @Column({ type: "uuid" })
   companyId: string;
 

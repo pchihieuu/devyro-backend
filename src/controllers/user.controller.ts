@@ -14,16 +14,9 @@ export const updateProfile = asyncHandler(
         _id: user.id,
         name: user.name,
         email: user.email,
-        avatar: user.avatar,
+        avatar: user.avatar || "",
         role: user.role,
         resume: user.resume || "",
-        companyName: user.companyName || "",
-        companyDescription: user.companyDescription || "",
-        companyLogo: user.companyLogo || "",
-        companySize: user.companySize || "",
-        companyIndustry: user.companyIndustry || "",
-        companyAddress: user.companyAddress || "",
-        companyWebsite: user.companyWebsite || "",
       },
     });
   }
