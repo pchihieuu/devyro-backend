@@ -67,9 +67,11 @@ export class Job {
   @DeleteDateColumn({ nullable: true })
   deletedAt?: Date;
 
+
   @ManyToOne(() => Company, (company) => company.jobs, { onDelete: "CASCADE" })
   @JoinColumn({ name: "companyId" })
   company: Company;
+
   @Column({ type: "uuid" })
   companyId: string;
 
