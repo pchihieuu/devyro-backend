@@ -1,6 +1,5 @@
 import * as dotenv from "dotenv";
 
-
 dotenv.config();
 
 interface DatabaseConfig {
@@ -11,8 +10,14 @@ interface DatabaseConfig {
   database: string;
 }
 
+interface JwtConfig {
+  secret: string;
+  expiresIn: string;
+}
+
 interface AppConfig {
   database: DatabaseConfig;
+  jwt: JwtConfig;
   nodeEnv: string;
   port: number;
 }
@@ -37,6 +42,10 @@ export const config: AppConfig = {
     username: process.env.DB_USERNAME || "postgres",
     password: process.env.DB_PASSWORD as string,
     database: process.env.DB_DATABASE as string,
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET as string,
+    expiresIn: process.env.JWT_EXPIRES_IN || "1h",
   },
   nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "5000", 10),
