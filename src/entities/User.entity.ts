@@ -12,6 +12,7 @@ import { Job } from "./Job.entity";
 import { Application } from "./Application.entity";
 import { SavedJob } from "./SavedJob.entity";
 import { Company } from "./Company.entity";
+import { Notification } from "./Notification.entity";
 
 export enum UserRole {
   JOBSEEKER = "jobseeker",
@@ -65,4 +66,7 @@ export class User {
 
   @OneToOne(() => Company, (company) => company.employer)
   company: Company;
+
+  @OneToMany(() => Notification, (notification) => notification.user)
+  notifications: Notification[];
 }

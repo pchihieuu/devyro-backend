@@ -8,6 +8,7 @@ import applicationRoutes from "./routes/application.route";
 import analyticsRoutes from "./routes/analytics.route";
 import savedJobRoutes from "./routes/savedJob.route";
 import companyRoutes from "./routes/company.route";
+import notificationRoutes from "./routes/notification.route";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { API_PREFIX, ROUTES } from "./constants/routes";
 
@@ -39,6 +40,7 @@ app.use(`${API_PREFIX}${ROUTES.APPLICATIONS.BASE}`, applicationRoutes);
 app.use(`${API_PREFIX}${ROUTES.SAVED_JOBS.BASE}`, savedJobRoutes);
 app.use(`${API_PREFIX}${ROUTES.ANALYTICS.BASE}`, analyticsRoutes);
 app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
+app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
 app.use(notFoundHandler);
 
 app.use(errorHandler);
