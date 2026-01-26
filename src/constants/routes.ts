@@ -36,6 +36,13 @@ export const ROUTES = {
     BY_ID: "/:jobId",
     MY: "/my",
   },
+  NOTIFICATIONS: {
+    BASE: "/notifications",
+    BY_ID: "/:id",
+    UNREAD_COUNT: "/unread-count",
+    MARK_READ: "/:id/read",
+    MARK_ALL_READ: "/read-all",
+  },
   ANALYTICS: {
     BASE: "/analytics",
     OVERVIEW: "/overview",

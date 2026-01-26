@@ -6,6 +6,7 @@ import { Application } from "../entities/Application.entity";
 import { SavedJob } from "../entities/SavedJob.entity";
 import { Analytics } from "../entities/Analytics.entity";
 import { Company } from "../entities/Company.entity";
+import { Notification } from "../entities/Notification.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -24,7 +25,15 @@ const baseConfig: Partial<DataSourceOptions> = {
 
 const developmentConfig: DataSourceOptions = {
   ...baseConfig,
-  entities: [User, Job, Application, SavedJob, Analytics, Company],
+  entities: [
+    User,
+    Job,
+    Application,
+    SavedJob,
+    Analytics,
+    Company,
+    Notification,
+  ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
 
