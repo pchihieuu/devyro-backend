@@ -1,5 +1,8 @@
 import { AppDataSource } from "../config/database.config";
-import { Notification, NotificationType } from "../entities/Notification.entity";
+import {
+  Notification,
+  NotificationType,
+} from "../entities/Notification.entity";
 import { getWebSocketService } from "./websocket.service";
 import { NotFoundError } from "../utils/errors";
 
@@ -14,7 +17,8 @@ export class NotificationService {
     metadata?: any;
   }): Promise<Notification> {
     const notification = this.notificationRepository.create(data);
-    const savedNotification = await this.notificationRepository.save(notification);
+    const savedNotification =
+      await this.notificationRepository.save(notification);
 
     // Send real-time notification via WebSocket
     try {
@@ -38,13 +42,18 @@ export class NotificationService {
     userId: string,
     limit: number = 50,
     offset: number = 0
-  ): Promise<{ notifications: Notification[]; total: number; unreadCount: number }> {
-    const [notifications, total] = await this.notificationRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: "DESC" },
-      take: limit,
-      skip: offset,
-    });
+  ): Promise<{
+    notifications: Notification[];
+    total: number;
+    unreadCount: number;
+  }> {
+    const [notifications, total] =
+      await this.notificationRepository.findAndCount({
+        where: { userId },
+        order: { createdAt: "DESC" },
+        take: limit,
+        skip: offset,
+      });
 
     const unreadCount = await this.notificationRepository.count({
       where: { userId, isRead: false },
@@ -73,7 +82,10 @@ export class NotificationService {
     );
   }
 
-  async deleteNotification(notificationId: string, userId: string): Promise<void> {
+  async deleteNotification(
+    notificationId: string,
+    userId: string
+  ): Promise<void> {
     const notification = await this.notificationRepository.findOne({
       where: { id: notificationId, userId },
     });
@@ -92,9 +104,11 @@ export class NotificationService {
   }
 
   // Helper methods for specific notification types
+  // Added jobId parameter
   async notifyApplicationStatusChanged(
     applicantId: string,
     applicationId: string,
+    jobId: string,
     jobTitle: string,
     companyName: string,
     newStatus: string
@@ -112,6 +126,7 @@ export class NotificationService {
       type: NotificationType.APPLICATION_STATUS_UPDATED,
       metadata: {
         applicationId,
+        jobId, // Include jobId in metadata for navigation
         jobTitle,
         companyName,
         status: newStatus,

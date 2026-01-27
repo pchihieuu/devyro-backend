@@ -233,11 +233,12 @@ export class ApplicationService {
     application.status = status;
     await this.applicationRepository.save(application);
 
-    // Send notification to applicant only if status changed
+    // Send notification with jobId, only if status changed
     if (oldStatus !== status) {
       await notificationService.notifyApplicationStatusChanged(
         application.applicantId,
         application.id,
+        application.job.id,
         application.job.title,
         application.job.company.name,
         status
