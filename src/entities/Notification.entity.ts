@@ -12,6 +12,7 @@ import { User } from "./User.entity";
 export enum NotificationType {
   APPLICATION_STATUS_UPDATED = "application_status_updated",
   JOB_APPLIED = "job_applied",
+  JOB_SAVED = "job_saved",
 }
 
 @Entity("notifications")
