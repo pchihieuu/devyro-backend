@@ -1,9 +1,9 @@
 import { AppDataSource } from "../config/database.config";
-import { Job, JobType } from "../entities/Job.entity";
+import { Job, JobType, JobLevel } from "../entities/Job.entity";
 import { SavedJob } from "../entities/SavedJob.entity";
 import { Application } from "../entities/Application.entity";
 import { Company } from "../entities/Company.entity";
-import { In, Like, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { In, Like, LessThanOrEqual, MoreThanOrEqual, ILike } from "typeorm";
 import { NotFoundError, ForbiddenError } from "../utils/errors";
 
 interface JobFilters {
@@ -11,6 +11,7 @@ interface JobFilters {
   location?: string;
   category?: string | string[];
   type?: string | string[];
+  level?: string;
   minSalary?: string;
   maxSalary?: string;
   userId?: string;
@@ -67,11 +68,11 @@ export class JobService {
     const where: any = { isClosed: false };
 
     if (filters.keyword) {
-      where.title = Like(`%${filters.keyword}%`);
+      where.title = ILike(`%${filters.keyword}%`);
     }
 
     if (filters.location) {
-      where.location = Like(`%${filters.location}%`);
+      where.location = ILike(`%${filters.location}%`);
     }
 
     if (filters.category) {
@@ -86,9 +87,16 @@ export class JobService {
       where.type = In(types as JobType[]);
     }
 
+    if (filters.level) {
+      where.level = filters.level as JobLevel;
+    }
+
     if (filters.minSalary && filters.maxSalary) {
-      where.salaryMin = LessThanOrEqual(Number(filters.maxSalary));
-      where.salaryMax = MoreThanOrEqual(Number(filters.minSalary));
+      const minSalary = Number(filters.minSalary);
+      const maxSalary = Number(filters.maxSalary);
+ 
+      where.salaryMax = MoreThanOrEqual(minSalary);
+      where.salaryMin = LessThanOrEqual(maxSalary);
     } else if (filters.minSalary) {
       where.salaryMax = MoreThanOrEqual(Number(filters.minSalary));
     } else if (filters.maxSalary) {

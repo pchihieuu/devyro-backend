@@ -40,6 +40,7 @@ export const getJobs = asyncHandler(
       location,
       category,
       type,
+      level,
       minSalary,
       maxSalary,
       userId,
@@ -54,6 +55,7 @@ export const getJobs = asyncHandler(
       location,
       category,
       type,
+      level, 
       minSalary,
       maxSalary,
       userId,
@@ -82,6 +84,7 @@ export const getJobs = asyncHandler(
     });
   }
 );
+
 export const getJobsEmployer = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     if (req.user!.role !== UserRole.EMPLOYER) {

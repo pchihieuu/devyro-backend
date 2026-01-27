@@ -24,6 +24,7 @@ export interface JobFilterQuery extends PaginationQuery {
   location?: string;
   category?: string | string[];
   type?: string | string[];
+  level?: string;
   minSalary?: string;
   maxSalary?: string;
   userId?: string;

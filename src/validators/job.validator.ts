@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JobType } from "../entities/Job.entity";
+import { JobType, JobLevel } from "../entities/Job.entity";
 
 export const createJobSchema = z.object({
   body: z
@@ -23,6 +23,7 @@ export const createJobSchema = z.object({
         .min(2, "Category must be at least 2 characters")
         .max(255, "Category must not exceed 255 characters"),
       type: z.nativeEnum(JobType),
+      level: z.nativeEnum(JobLevel).optional(),
       salaryMin: z
         .number()
         .positive("Minimum salary must be positive")
@@ -59,6 +60,7 @@ export const updateJobSchema = z.object({
       location: z.string().min(2).max(255).optional(),
       category: z.string().min(2).max(255).optional(),
       type: z.nativeEnum(JobType).optional(),
+      level: z.nativeEnum(JobLevel).optional(),
       salaryMin: z.number().positive().optional(),
       salaryMax: z.number().positive().optional(),
     })
@@ -92,6 +94,7 @@ export const getJobsSchema = z.object({
     location: z.string().optional(),
     category: z.union([z.string(), z.array(z.string())]).optional(),
     type: z.union([z.string(), z.array(z.string())]).optional(),
+    level: z.string().optional(),
     minSalary: z.string().regex(/^\d+$/, "Must be a number").optional(),
     maxSalary: z.string().regex(/^\d+$/, "Must be a number").optional(),
     userId: z.string().uuid().optional(),
