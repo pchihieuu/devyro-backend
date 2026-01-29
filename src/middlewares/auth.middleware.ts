@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database.config";
 import { User } from "../entities/User.entity";
-import { verifyToken } from "../utils/token.utils";
+import { verifyAccessToken } from "../utils/token.utils";
 
 export const protect = async (
   req: Request,
@@ -12,12 +12,17 @@ export const protect = async (
     let token = req.headers.authorization;
 
     if (!token || !token.startsWith("Bearer")) {
-      res.status(401).json({ message: "Not authorized, no token" });
+      res.status(401).json({
+        success: false,
+        message: "Not authorized, no token provided",
+      });
       return;
     }
 
     token = token.split(" ")[1];
-    const decoded = verifyToken(token);
+
+    // Verify access token
+    const decoded = verifyAccessToken(token);
 
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
@@ -35,15 +40,29 @@ export const protect = async (
     });
 
     if (!user) {
-      res.status(401).json({ message: "User not found" });
+      res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
       return;
     }
 
     req.user = user;
     next();
   } catch (error) {
+    // Check if token is expired
+    if (error instanceof Error && error.message.includes("expired")) {
+      res.status(401).json({
+        success: false,
+        message: "Access token expired",
+        code: "TOKEN_EXPIRED",
+      });
+      return;
+    }
+
     res.status(401).json({
-      message: "Token failed",
+      success: false,
+      message: "Invalid access token",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }

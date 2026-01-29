@@ -5,18 +5,29 @@ import {
   authLimiter,
   uploadLimiter,
 } from "../middlewares/rateLimiter.middleware";
-import { registerSchema, loginSchema } from "../validators/auth.validator";
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+} from "../validators/auth.validator";
 import {
   register,
   login,
   getMe,
   uploadImage,
   uploadResume,
+  logout,
+  logoutAll,
+  getActiveSessions,
+  revokeSession,
+  refreshToken,
+  uploadImagePublic,
 } from "../controllers/auth.controller";
 import upload from "../middlewares/upload.middleware";
 import { ROUTES } from "../constants/routes";
 
 const router = Router();
+
 router.post(
   ROUTES.AUTH.REGISTER,
   authLimiter,
@@ -26,8 +37,28 @@ router.post(
 
 router.post(ROUTES.AUTH.LOGIN, authLimiter, validate(loginSchema), login);
 
-router.get(ROUTES.AUTH.ME, protect, getMe);
+router.post(
+  ROUTES.AUTH.REFRESH_TOKEN,
+  authLimiter,
+  validate(refreshTokenSchema),
+  refreshToken
+);
 
+router.post(
+  ROUTES.AUTH.UPLOAD_IMAGE_PUBLIC,
+  uploadLimiter,
+  upload.single("image"),
+  uploadImagePublic
+);
+
+router.get(ROUTES.AUTH.ME, protect, getMe);
+router.post(ROUTES.AUTH.LOGOUT, protect, logout);
+
+router.post(ROUTES.AUTH.LOGOUT_ALL, protect, logoutAll);
+
+router.get(ROUTES.AUTH.SESSIONS, protect, getActiveSessions);
+
+router.delete(ROUTES.AUTH.REVOKE_SESSION, protect, revokeSession);
 router.post(
   ROUTES.AUTH.UPLOAD_IMAGE,
   protect,
