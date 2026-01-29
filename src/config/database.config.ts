@@ -7,6 +7,7 @@ import { SavedJob } from "../entities/SavedJob.entity";
 import { Analytics } from "../entities/Analytics.entity";
 import { Company } from "../entities/Company.entity";
 import { Notification } from "../entities/Notification.entity";
+import { RefreshToken } from "../entities/Refreshtoken.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -33,6 +34,7 @@ const developmentConfig: DataSourceOptions = {
     Analytics,
     Company,
     Notification,
+    RefreshToken,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;

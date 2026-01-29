@@ -1,13 +1,20 @@
-export const API_PREFIX = "/api/v1";
+export const API_VERSION = "v1";
+export const API_PREFIX = `/api/${API_VERSION}`;
 
 export const ROUTES = {
   AUTH: {
     BASE: "/auth",
     REGISTER: "/register",
     LOGIN: "/login",
+    REFRESH_TOKEN: "/refresh-token",
+    LOGOUT: "/logout",
+    LOGOUT_ALL: "/logout-all",
+    SESSIONS: "/sessions",
+    REVOKE_SESSION: "/sessions/:tokenId",
     PROFILE: "/profile",
     ME: "/me",
     UPLOAD_IMAGE: "/upload-image",
+    UPLOAD_IMAGE_PUBLIC: "/upload-image-public",
     UPLOAD_RESUME: "/upload-resume",
   },
   USERS: {
