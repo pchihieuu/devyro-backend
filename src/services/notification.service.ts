@@ -115,7 +115,7 @@ export class NotificationService {
   ): Promise<void> {
     const statusMessages: Record<string, string> = {
       "In Review": "is now being reviewed",
-      Accepted: "has been accepted! 🎉",
+      Accepted: "has been accepted!",
       Rejected: "was not successful this time",
     };
 
@@ -126,7 +126,7 @@ export class NotificationService {
       type: NotificationType.APPLICATION_STATUS_UPDATED,
       metadata: {
         applicationId,
-        jobId, // Include jobId in metadata for navigation
+        jobId, 
         jobTitle,
         companyName,
         status: newStatus,

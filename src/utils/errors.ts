@@ -20,8 +20,10 @@ export class BadRequestError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = "Unauthorized") {
+  code?: string;
+  constructor(message: string, code?: string) {
     super(message, HTTP_STATUS.UNAUTHORIZED);
+    this.code = code;
   }
 }
 

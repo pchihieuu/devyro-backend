@@ -3,8 +3,8 @@ import { authService } from "../services/auth.service";
 import { uploadService } from "../services/upload.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS } from "../constants/httpStatus";
-import { BadRequestError } from "../utils/errors";
-import { success } from "zod";
+import { BadRequestError, UnauthorizedError } from "../utils/errors";
+import { config } from "../config/env.config";
 
 /**
  * Get device info from request
@@ -24,17 +24,61 @@ const getIpAddress = (req: Request): string => {
   );
 };
 
+/**
+ * Set secure httpOnly cookie for refresh token
+ */
+const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
+  const isProduction = config.nodeEnv === "production";
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? ("strict" as const) : ("lax" as const),
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+    ...(isProduction && config.cookieDomain && { domain: config.cookieDomain }),
+  };
+
+  res.cookie("refreshToken", refreshToken, cookieOptions);
+
+  if (!isProduction) {
+    console.log("Refresh token cookie set");
+  }
+};
+
+/**
+ * Clear refresh token cookie
+ */
+const clearRefreshTokenCookie = (res: Response) => {
+  const isProduction = config.nodeEnv === "production";
+  
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? ("strict" as const) : ("lax" as const),
+    path: "/",
+  });
+
+  if (!isProduction) {
+    console.log("Refresh token cookie cleared");
+  }
+};
+
 export const register = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const deviceInfo = getDeviceInfo(req);
     const ipAddress = getIpAddress(req);
 
-    const user = await authService.register(req.body, deviceInfo, ipAddress);
+    const result = await authService.register(req.body, deviceInfo, ipAddress);
+
+    setRefreshTokenCookie(res, result.refreshToken);
+
+    const { refreshToken, ...userData } = result;
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
       message: "User registered successfully",
-      data: user,
+      data: userData,
     });
   }
 );
@@ -44,52 +88,77 @@ export const login = asyncHandler(
     const deviceInfo = getDeviceInfo(req);
     const ipAddress = getIpAddress(req);
 
-    const user = await authService.login({
-      ...req.body,
-      deviceInfo,
-      ipAddress,
-    });
+    try {
+      const result = await authService.login({
+        ...req.body,
+        deviceInfo,
+        ipAddress,
+      });
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Login successful",
-      data: user,
-    });
+      setRefreshTokenCookie(res, result.refreshToken);
+
+      const { refreshToken, ...userData } = result;
+
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: "Login successful",
+        data: userData,
+      });
+    } catch (error) {
+      // Clear any existing cookie on failed login
+      clearRefreshTokenCookie(res);
+      throw error;
+    }
   }
 );
 
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
-      throw new BadRequestError("Refresh token is required");
+      throw new UnauthorizedError(
+        "Refresh token not found",
+        "REFRESH_TOKEN_MISSING"
+      );
     }
 
-    const deviceInfo = getDeviceInfo(req);
-    const ipAddress = getIpAddress(req);
+    try {
+      const deviceInfo = getDeviceInfo(req);
+      const ipAddress = getIpAddress(req);
 
-    const tokens = await authService.refreshAccessToken({
-      refreshToken,
-      deviceInfo,
-      ipAddress,
-    });
+      const tokens = await authService.refreshAccessToken({
+        refreshToken,
+        deviceInfo,
+        ipAddress,
+      });
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Token refreshed successfully",
-      data: tokens,
-    });
+      setRefreshTokenCookie(res, tokens.refreshToken);
+
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: "Token refreshed successfully",
+        data: {
+          accessToken: tokens.accessToken,
+        },
+      });
+    } catch (error) {
+      // Clear invalid cookie
+      clearRefreshTokenCookie(res);
+      throw error;
+    }
   }
 );
 
 export const logout = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken && req.user) {
       await authService.logout(req.user.id, refreshToken);
     }
+
+    clearRefreshTokenCookie(res);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -105,6 +174,8 @@ export const logoutAll = asyncHandler(
     }
 
     await authService.logoutAll(req.user.id);
+
+    clearRefreshTokenCookie(res);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -175,6 +246,7 @@ export const uploadImagePublic = asyncHandler(
     });
   }
 );
+
 export const uploadImage = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     if (!req.file) {
@@ -208,7 +280,6 @@ export const uploadResume = asyncHandler(
       req.file.mimetype
     );
 
-    // Update user's resume URL
     await authService.updateUserResume(req.user!.id, result.url);
 
     res.status(HTTP_STATUS.CREATED).json({
