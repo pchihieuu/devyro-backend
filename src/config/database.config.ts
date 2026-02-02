@@ -14,20 +14,20 @@ const isProduction = config.nodeEnv === "production";
 
 const baseConfig: Partial<DataSourceOptions> = {
   type: "postgres",
-  host: config.database.host,
-  port: config.database.port,
-  username: config.database.username,
-  password: config.database.password,
-  database: config.database.database,
   synchronize: false,
   logging: !isProduction,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
   migrationsTableName: "migrations",
   subscribers: [],
 };
 
 const developmentConfig: DataSourceOptions = {
   ...baseConfig,
+  host: config.database.host,
+  port: config.database.port,
+  username: config.database.username,
+  password: config.database.password,
+  database: config.database.database,
+  ssl: false,
   entities: [
     User,
     Job,
@@ -44,6 +44,11 @@ const developmentConfig: DataSourceOptions = {
 
 const productionConfig: DataSourceOptions = {
   ...baseConfig,
+
+  url: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
   entities: ["dist/entities/**/*.entity.js"],
   migrations: ["dist/migrations/**/*.js"],
 } as DataSourceOptions;
