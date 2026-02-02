@@ -21,6 +21,7 @@ const baseConfig: Partial<DataSourceOptions> = {
   database: config.database.database,
   synchronize: false,
   logging: !isProduction,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
   migrationsTableName: "migrations",
   subscribers: [],
 };
