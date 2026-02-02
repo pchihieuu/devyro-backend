@@ -1,0 +1,26 @@
+import cron from "node-cron";
+import { authService } from "../services/auth.service";
+
+/**
+ * Setup scheduled jobs
+ */
+export const setupScheduledJobs = () => {
+  // Run cleanup every day at 2:00 AM
+  cron.schedule("0 2 * * *", async () => {
+    console.log("Running scheduled cleanup job for expired tokens...");
+    
+    try {
+      // Clean up expired refresh tokens
+      await authService.cleanupExpiredTokens();
+      console.log("Expired refresh tokens cleaned up successfully");
+
+      // Clean up expired password reset tokens
+      await authService.cleanupExpiredResetTokens();
+      console.log("Expired password reset tokens cleaned up successfully");
+    } catch (error) {
+      console.error("Error during cleanup job:", error);
+    }
+  });
+
+  console.log("Scheduled jobs initialized");
+};

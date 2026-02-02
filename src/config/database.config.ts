@@ -8,6 +8,7 @@ import { Analytics } from "../entities/Analytics.entity";
 import { Company } from "../entities/Company.entity";
 import { Notification } from "../entities/Notification.entity";
 import { RefreshToken } from "../entities/Refreshtoken.entity";
+import { PasswordResetToken } from "../entities/Passwordresettoken.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -35,6 +36,7 @@ const developmentConfig: DataSourceOptions = {
     Company,
     Notification,
     RefreshToken,
+    PasswordResetToken,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;

@@ -9,6 +9,7 @@ import {
 } from "./config/database.initializer";
 import { initializeWebSocket } from "./services/websocket.service";
 import { createServer } from "http";
+import { setupScheduledJobs } from "./jobs/scheduledJobs";
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,6 +18,7 @@ const httpServer = createServer(app);
 const startServer = async () => {
   try {
     await initializeDatabase();
+    setupScheduledJobs();
 
     initializeWebSocket(httpServer);
     console.log("WebSocket initialized successfully");

@@ -51,7 +51,7 @@ const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
  */
 const clearRefreshTokenCookie = (res: Response) => {
   const isProduction = config.nodeEnv === "production";
-  
+
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: isProduction,
@@ -77,7 +77,8 @@ export const register = asyncHandler(
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
-      message: "User registered successfully",
+      message:
+        "User registered successfully. Welcome email sent to your inbox.",
       data: userData,
     });
   }
@@ -288,6 +289,60 @@ export const uploadResume = asyncHandler(
       data: {
         resumeUrl: result.url,
       },
+    });
+  }
+);
+
+/**
+ * Forgot Password - Send reset email
+ */
+export const forgotPassword = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { email } = req.body;
+
+    await authService.forgotPassword({ email });
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message:
+        "If an account exists with this email, a password reset link has been sent.",
+    });
+  }
+);
+
+/**
+ * Reset Password - Using token from email
+ */
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { token, newPassword } = req.body;
+
+    await authService.resetPassword({ token, newPassword });
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message:
+        "Password has been reset successfully. Please login with your new password.",
+    });
+  }
+);
+
+/**
+ * Verify Reset Token - Check if token is valid
+ */
+export const verifyResetToken = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { token } = req.params;
+
+    const isValid = await authService.verifyResetToken(token);
+
+    if (!isValid) {
+      throw new BadRequestError("Invalid or expired password reset token");
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: "Token is valid",
     });
   }
 );

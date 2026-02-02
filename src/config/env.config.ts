@@ -27,6 +27,7 @@ interface CloudinaryConfig {
 interface EmailConfig {
   host: string;
   port: number;
+  secure: boolean;
   user: string;
   password: string;
   from: string;
@@ -111,17 +112,18 @@ export const config: AppConfig = {
   email: {
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port: parseInt(process.env.EMAIL_PORT || "587", 10),
+    secure: process.env.EMAIL_SECURE === "true",
     user: process.env.EMAIL_USER || "",
     password: process.env.EMAIL_PASSWORD || "",
     from: process.env.EMAIL_FROM || "noreply@jobportal.com",
-    fromName: process.env.EMAIL_FROM_NAME || "Job Portal",
+    fromName: process.env.EMAIL_FROM_NAME || "JobPortal",
   },
   cors: {
     origin:
       process.env.CORS_ORIGIN ||
       process.env.CLIENT_URL ||
       "http://localhost:5173",
-    credentials: true, 
+    credentials: true,
   },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10),
@@ -145,5 +147,5 @@ export const config: AppConfig = {
   port: parseInt(process.env.PORT || "5000", 10),
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
-  cookieDomain: process.env.COOKIE_DOMAIN, 
+  cookieDomain: process.env.COOKIE_DOMAIN,
 };

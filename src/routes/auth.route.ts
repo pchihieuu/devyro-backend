@@ -9,6 +9,9 @@ import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  verifyResetTokenSchema,
 } from "../validators/auth.validator";
 import {
   register,
@@ -22,6 +25,9 @@ import {
   revokeSession,
   refreshToken,
   uploadImagePublic,
+  forgotPassword,
+  resetPassword,
+  verifyResetToken,
 } from "../controllers/auth.controller";
 import upload from "../middlewares/upload.middleware";
 import { ROUTES } from "../constants/routes";
@@ -49,6 +55,26 @@ router.post(
   uploadLimiter,
   upload.single("image"),
   uploadImagePublic
+);
+
+router.post(
+  ROUTES.AUTH.FORGOT_PASSWORD,
+  authLimiter,
+  validate(forgotPasswordSchema),
+  forgotPassword
+);
+
+router.post(
+  ROUTES.AUTH.RESET_PASSWORD,
+  authLimiter,
+  validate(resetPasswordSchema),
+  resetPassword
+);
+
+router.get(
+  ROUTES.AUTH.VERIFY_RESET_TOKEN,
+  validate(verifyResetTokenSchema),
+  verifyResetToken
 );
 
 router.get(ROUTES.AUTH.ME, protect, getMe);

@@ -16,6 +16,9 @@ export const ROUTES = {
     UPLOAD_IMAGE: "/upload-image",
     UPLOAD_IMAGE_PUBLIC: "/upload-image-public",
     UPLOAD_RESUME: "/upload-resume",
+    FORGOT_PASSWORD: "/forgot-password",
+    RESET_PASSWORD: "/reset-password",
+    VERIFY_RESET_TOKEN: "/verify-reset-token/:token",
   },
   USERS: {
     BASE: "/users",
