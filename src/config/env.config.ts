@@ -115,13 +115,13 @@ export const config: AppConfig = {
     user: process.env.EMAIL_USER || "",
     password: process.env.EMAIL_PASSWORD || "",
     from: process.env.EMAIL_FROM || "noreply@jobportal.com",
-    fromName: process.env.EMAIL_FROM_NAME || "JobPortal",
+    fromName: process.env.EMAIL_FROM_NAME || "Job Portal",
   },
   cors: {
     origin:
       process.env.CORS_ORIGIN ||
       process.env.CLIENT_URL ||
-      "http://localhost:5173",
+      "https://job-portal-vn.vercel.app/",
     credentials: true,
   },
   rateLimit: {
