@@ -1,7 +1,6 @@
-import jwt from "jsonwebtoken";
-import {JwtPayload } from "../types/express";
+import jwt, { SignOptions } from "jsonwebtoken";
+import { JwtPayload } from "../types/express";
 import { config } from "../config/env.config";
-
 
 export interface TokenPayload {
   id: string;
@@ -12,17 +11,18 @@ export interface TokenPayload {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-} 
+}
+
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.jwt.secret, {
     expiresIn: config.jwt.accessExpiresIn || "15m",
-  });
+  } as SignOptions);
 };
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshTokenExpiresIn || "7d",
-  });
+  } as SignOptions);
 };
 
 export const generateTokens = (payload: TokenPayload): AuthTokens => {
