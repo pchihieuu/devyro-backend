@@ -24,13 +24,15 @@ interface CloudinaryConfig {
 }
 
 interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  user: string;
-  password: string;
+  // host: string;
+  // port: number;
+  // secure: boolean;
+  // user: string;
+  // password: string;
   from: string;
-  fromName: string;
+  // fromName: string;
+  resendApiKey: string;
+  frontendUrl: string;
 }
 
 interface CorsConfig {
@@ -109,13 +111,18 @@ export const config: AppConfig = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
   },
   email: {
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.EMAIL_PORT || "587", 10),
-    secure: process.env.EMAIL_SECURE === "true",
-    user: process.env.EMAIL_USER || "",
-    password: process.env.EMAIL_PASSWORD || "",
-    from: process.env.EMAIL_FROM || "noreply@jobportal.com",
-    fromName: process.env.EMAIL_FROM_NAME || "Job Portal",
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    from: process.env.EMAIL_FROM || "JobPortal <onboarding@resend.dev>", // Format: "Name <email@domain.com>"
+
+    // Frontend URL for reset links
+    frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    // host: process.env.EMAIL_HOST || "smtp.gmail.com",
+    // port: parseInt(process.env.EMAIL_PORT || "587", 10),
+    // secure: process.env.EMAIL_SECURE === "true",
+    // user: process.env.EMAIL_USER || "",
+    // password: process.env.EMAIL_PASSWORD || "",
+    // from: process.env.EMAIL_FROM || "noreply@jobportal.com",
+    // fromName: process.env.EMAIL_FROM_NAME || "Job Portal",
   },
   cors: {
     origin:
