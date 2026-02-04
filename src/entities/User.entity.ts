@@ -40,10 +40,10 @@ export class User {
   role: UserRole;
 
   @Column({ type: "varchar", nullable: true })
-  avatar: string;
+  avatar: string | null;
 
   @Column({ type: "varchar", nullable: true })
-  resume: string;
+  resume: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

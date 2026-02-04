@@ -27,21 +27,26 @@ export class UserService {
       throw new NotFoundError("User not found");
     }
 
-    if (data.name) {
+    if (data.name !== undefined && data.name.trim() !== "") {
       user.name = data.name;
     }
-    if (data.avatar && data.avatar !== user.avatar) {
-      await this.deleteOldFile(user.avatar, "image");
-      user.avatar = data.avatar;
+
+    if (data.avatar !== undefined) {
+      if (data.avatar !== user.avatar) {
+        await this.deleteOldFile(user.avatar, "image");
+        user.avatar = data.avatar;
+      }
     }
 
-    if (
-      user.role === UserRole.JOBSEEKER &&
-      data.resume &&
-      data.resume !== user.resume
-    ) {
-      await this.deleteOldFile(user.resume, "raw");
-      user.resume = data.resume;
+    if (data.resume !== undefined) {
+      if (user.role !== UserRole.JOBSEEKER) {
+        throw new ForbiddenError("Only jobseekers can update resume");
+      }
+
+      if (data.resume !== user.resume) {
+        await this.deleteOldFile(user.resume, "raw");
+        user.resume = data.resume;
+      }
     }
 
     await this.userRepository.save(user);
@@ -55,21 +60,28 @@ export class UserService {
   async deleteResume(userId: string): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
-    if (!user) throw new NotFoundError("User not found");
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
     if (user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can delete resume");
     }
 
+    if (!user.resume) {
+      throw new NotFoundError("No resume found to delete");
+    }
+
     await this.deleteOldFile(user.resume, "raw");
 
-    user.resume = "";
+    user.resume = null;
     await this.userRepository.save(user);
   }
 
   /**
    * Get public user profile
    */
-  async getPublicProfile(userId: string): Promise<User> {
+  async getPublicProfile(userId: string): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ["company"],
@@ -89,14 +101,24 @@ export class UserService {
       throw new NotFoundError("User not found");
     }
 
-    return user;
+   
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar || "",
+      resume: user.resume || "",
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   /**
    * Delete old file from Cloudinary
    */
   private async deleteOldFile(
-    fileUrl: string | undefined,
+    fileUrl: string | null | undefined,
     resourceType: "image" | "raw"
   ): Promise<void> {
     if (fileUrl) {
@@ -106,6 +128,7 @@ export class UserService {
           await deleteFromCloudinary(publicId, resourceType);
         } catch (error) {
           console.error(`Error deleting old ${resourceType}:`, error);
+         
         }
       }
     }
