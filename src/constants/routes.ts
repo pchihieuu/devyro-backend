@@ -40,6 +40,7 @@ export const ROUTES = {
     UPDATE_STATUS: "/:id/status",
     JOB_APPLICATIONS: "/job/:jobId",
     WITH_DRAW: "/:id/withdraw",
+    ANALYZE: "/:id/analyze"
   },
   SAVED_JOBS: {
     BASE: "/saved-jobs",

@@ -128,3 +128,23 @@ export const withdrawApplication = asyncHandler(
     });
   }
 );
+
+
+export const triggerAIAnalysis = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (req.user!.role !== UserRole.EMPLOYER) {
+      throw new ForbiddenError("Only employers can trigger AI analysis");
+    }
+
+    const result = await applicationService.triggerAIAnalysis(
+      req.params.id,
+      req.user!.id
+    );
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: result.message,
+      data: result.analysis,
+    });
+  }
+);

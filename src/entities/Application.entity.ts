@@ -18,6 +18,29 @@ export enum ApplicationStatus {
   ACCEPTED = "Accepted",
 }
 
+export interface AIMatchingAnalysis {
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  skillsMatch: {
+    matched: string[];
+    missing: string[];
+    matchPercentage: number;
+  };
+  experienceMatch: {
+    summary: string;
+    yearsRequired?: number;
+    yearsCandidate?: number;
+    isMatch: boolean;
+  };
+  educationMatch: {
+    summary: string;
+    isMatch: boolean;
+  };
+  overallAssessment: string;
+}
+
 @Entity("applications")
 export class Application {
   @PrimaryGeneratedColumn("uuid")
@@ -33,6 +56,29 @@ export class Application {
   })
   status: ApplicationStatus;
 
+  @Column({ 
+    type: "decimal", 
+    precision: 5, 
+    scale: 2, 
+    nullable: true,
+    comment: "AI-generated matching score (0-100)"
+  })
+  aiMatchingScore: number;
+
+  @Column({ 
+    type: "jsonb", 
+    nullable: true,
+    comment: "Detailed AI analysis"
+  })
+  aiMatchingAnalysis: AIMatchingAnalysis;
+
+  @Column({ 
+    type: "timestamp", 
+    nullable: true,
+    comment: "Timestamp when AI analysis was performed"
+  })
+  aiAnalyzedAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -41,6 +87,7 @@ export class Application {
 
   @DeleteDateColumn()
   deletedAt: Date;
+
   // Relations
   @ManyToOne(() => Job, (job) => job.applications, { onDelete: "CASCADE" })
   @JoinColumn({ name: "jobId" })

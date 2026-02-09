@@ -23,6 +23,10 @@ interface CloudinaryConfig {
   apiSecret: string;
 }
 
+interface GeminiApi {
+  apiKey: string; 
+}
+
 interface EmailConfig {
   host: string;
   port: number;
@@ -68,6 +72,7 @@ interface AppConfig {
   clientUrl: string;
   frontendUrl: string;
   cookieDomain?: string;
+  gemini: GeminiApi;
 }
 
 const validateEnv = (): void => {
@@ -76,6 +81,7 @@ const validateEnv = (): void => {
     "DB_DATABASE",
     "JWT_SECRET",
     "JWT_REFRESH_SECRET",
+    "GEMINI_API_KEY",
   ];
   const missing = required.filter((key) => !process.env[key]);
 
@@ -116,6 +122,9 @@ export const config: AppConfig = {
     password: process.env.EMAIL_PASSWORD || "",
     from: process.env.EMAIL_FROM || "noreply@jobportal.com",
     fromName: process.env.EMAIL_FROM_NAME || "Job Portal",
+  },
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY as string,
   },
   cors: {
     origin:
