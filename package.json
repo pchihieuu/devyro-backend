@@ -16,6 +16,8 @@
     "migration:show": "npm run typeorm -- migration:show -d src/config/database.config.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.5",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -31,6 +33,7 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.13",
+    "pdf-parse": "^1.1.4",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.1.13",
     "socket.io": "^4.8.3",
@@ -50,6 +53,7 @@
     "@types/node": "^20.9.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.9",
+    "@types/pdf-parse": "^1.1.5",
     "@types/socket.io": "^3.0.1",
     "cross-env": "^10.1.0",
     "nodemon": "^3.0.1",

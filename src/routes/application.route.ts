@@ -14,6 +14,7 @@ import {
   getApplicationById,
   updateStatus,
   withdrawApplication,
+  triggerAIAnalysis,
 } from "../controllers/application.controller";
 import { ROUTES } from "../constants/routes";
 
@@ -51,5 +52,12 @@ router.put(
 );
 
 router.delete(ROUTES.APPLICATIONS.WITH_DRAW, protect, withdrawApplication);
+
+router.post(
+ROUTES.APPLICATIONS.ANALYZE,
+  protect,
+  validate(getApplicationByIdSchema),
+  triggerAIAnalysis
+);
 
 export default router;

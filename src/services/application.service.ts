@@ -10,6 +10,8 @@ import {
 } from "../utils/errors";
 import { IsNull } from "typeorm";
 import { notificationService } from "./notification.service";
+import { geminiAIMatchingService } from "./geminiaimatching.service";
+import { cleanResumeText, extractPDFText } from "../utils/pdfextractor.utils";
 
 export class ApplicationService {
   private applicationRepository = AppDataSource.getRepository(Application);
@@ -17,7 +19,7 @@ export class ApplicationService {
   private companyRepository = AppDataSource.getRepository(Company);
 
   /**
-   * Apply to a job
+   * Apply to a job with AI matching analysis
    */
   async applyToJob(
     jobId: string,
@@ -55,6 +57,7 @@ export class ApplicationService {
       throw new BadRequestError("Resume is required to apply for this job");
     }
 
+    // Create application
     const application = this.applicationRepository.create({
       jobId,
       applicantId,
@@ -63,6 +66,18 @@ export class ApplicationService {
     });
 
     const savedApplication = await this.applicationRepository.save(application);
+
+    // Perform AI matching analysis asynchronously (don't block the response)
+    this.performAIAnalysis(savedApplication.id, resumeUrl, job).catch(
+      (error) => {
+        console.error(
+          "AI Analysis failed for application:",
+          savedApplication.id,
+          error
+        );
+       
+      }
+    );
 
     // Load applicant details
     const fullApplication = await this.applicationRepository.findOne({
@@ -82,6 +97,120 @@ export class ApplicationService {
     }
 
     return savedApplication;
+  }
+
+  /**
+   * Perform AI matching analysis (async) - USING GEMINI
+   */
+  private async performAIAnalysis(
+    applicationId: string,
+    resumeUrl: string,
+    job: Job
+  ): Promise<void> {
+    try {
+
+      let resumeText: string;
+
+      try {
+        resumeText = await extractPDFText(resumeUrl);
+        resumeText = cleanResumeText(resumeText);
+      } catch (pdfError) {
+        console.error("PDF extraction failed, using URL only:", pdfError);
+        resumeText = `Resume URL: ${resumeUrl}`;
+      }
+
+      const analysis = await geminiAIMatchingService.analyzeResumeJobMatch(
+        { url: resumeUrl, text: resumeText },
+        job
+      );
+
+      // Update application with analysis results
+      await this.applicationRepository.update(applicationId, {
+        aiMatchingScore: analysis.score,
+        aiMatchingAnalysis: analysis,
+        aiAnalyzedAt: new Date(),
+      });
+
+      console.log(
+        `Gemini AI analysis completed for application ${applicationId}: Score ${analysis.score}`
+      );
+    } catch (error) {
+      console.error("Gemini AI analysis error:", error);
+      await this.applicationRepository.update(applicationId, {
+        aiMatchingScore: 0,
+        aiMatchingAnalysis: {
+          score: 0,
+          strengths: [],
+          weaknesses: [],
+          recommendations: ["AI analysis failed - manual review required"],
+          skillsMatch: {
+            matched: [],
+            missing: [],
+            matchPercentage: 0,
+          },
+          experienceMatch: {
+            summary: "Analysis unavailable",
+            isMatch: false,
+          },
+          educationMatch: {
+            summary: "Analysis unavailable",
+            isMatch: false,
+          },
+          overallAssessment:
+            "AI analysis encountered an error. Please review manually.",
+        },
+        aiAnalyzedAt: new Date(),
+      });
+    }
+  }
+
+  /**
+   * Manually trigger AI analysis for existing application
+   */
+  async triggerAIAnalysis(
+    applicationId: string,
+    employerId: string
+  ): Promise<{ message: string; analysis?: any }> {
+    const application = await this.applicationRepository.findOne({
+      where: { id: applicationId },
+      relations: ["job", "job.company"],
+    });
+
+    if (!application) {
+      throw new NotFoundError("Application not found");
+    }
+
+    if (application.job.company.employerId !== employerId) {
+      throw new ForbiddenError("Not authorized to analyze this application");
+    }
+
+    if (!application.resume) {
+      throw new BadRequestError("No resume found for this application");
+    }
+
+    // Perform analysis
+    await this.performAIAnalysis(
+      application.id,
+      application.resume,
+      application.job
+    );
+
+    // Fetch updated application
+    const updated = await this.applicationRepository.findOne({
+      where: { id: applicationId },
+      select: ["aiMatchingScore", "aiMatchingAnalysis", "aiAnalyzedAt"],
+    });
+
+    return {
+      message: "Gemini AI analysis completed successfully",
+      analysis: updated
+        ? {
+            score: updated.aiMatchingScore,
+            details: updated.aiMatchingAnalysis,
+            analyzedAt: updated.aiAnalyzedAt,
+          }
+        : undefined,
+    };
   }
 
   /**
@@ -106,7 +235,7 @@ export class ApplicationService {
   }
 
   /**
-   * Get applicants for a specific job (Employer only)
+   * Get applicants for a specific job (Employer only) - with AI scores
    */
   async getApplicantsForJob(
     jobId: string,
@@ -150,12 +279,15 @@ export class ApplicationService {
           resume: true,
         },
       },
-      order: { createdAt: "DESC" },
+      order: {
+        aiMatchingScore: "DESC",
+        createdAt: "DESC",
+      },
     });
   }
 
   /**
-   * Get application by ID
+   * Get application by ID - with AI analysis
    */
   async getApplicationById(
     applicationId: string,
