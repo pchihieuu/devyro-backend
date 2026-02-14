@@ -5,15 +5,24 @@ import {
   updateProfileSchema,
   deleteResumeSchema,
   getPublicProfileSchema,
+  searchUsersSchema,
 } from "../validators/user.validator";
 import {
   updateProfile,
   deleteResume,
   getPublicProfile,
+  searchUsers,
 } from "../controllers/user.controller";
 import { ROUTES } from "../constants/routes";
 
 const router = Router();
+
+router.get(
+  ROUTES.USERS.SEARCH,
+  protect,
+  validate(searchUsersSchema),
+  searchUsers
+);
 
 router.put(
   ROUTES.USERS.UPDATE_PROFILE,
@@ -21,6 +30,7 @@ router.put(
   validate(updateProfileSchema),
   updateProfile
 );
+
 router.delete(
   ROUTES.USERS.DELETE_RESUME,
   protect,

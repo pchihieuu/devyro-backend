@@ -43,3 +43,31 @@ export const getPublicProfile = asyncHandler(
     });
   }
 );
+
+export const searchUsers = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const query = req.query.q as string;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    if (!query || query.trim() === "") {
+      res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: "Search query is required",
+      });
+      return;
+    }
+
+    const result = await userService.searchUsers(
+      query,
+      req.user!.id,
+      page,
+      limit
+    );
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: result,
+    });
+  }
+);

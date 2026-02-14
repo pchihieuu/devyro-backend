@@ -75,3 +75,11 @@ export const getPublicProfileSchema = z.object({
     id: z.string().uuid("Invalid user ID format"),
   }),
 });
+
+export const searchUsersSchema = z.object({
+  query: z.object({
+    q: z.string().min(1, "Search query is required"),
+    page: z.string().optional(),
+    limit: z.string().optional(),
+  }),
+});
