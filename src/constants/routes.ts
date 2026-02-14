@@ -25,6 +25,7 @@ export const ROUTES = {
     BY_ID: "/:id",
     UPDATE_PROFILE: "/profile",
     DELETE_RESUME: "/resume",
+    SEARCH: "/search",
   },
   JOBS: {
     BASE: "/jobs",
@@ -40,7 +41,7 @@ export const ROUTES = {
     UPDATE_STATUS: "/:id/status",
     JOB_APPLICATIONS: "/job/:jobId",
     WITH_DRAW: "/:id/withdraw",
-    ANALYZE: "/:id/analyze"
+    ANALYZE: "/:id/analyze",
   },
   SAVED_JOBS: {
     BASE: "/saved-jobs",
@@ -63,5 +64,16 @@ export const ROUTES = {
     BY_ID: "/:id",
     MY: "/my",
     JOBS: "/:id/jobs",
+  },
+  CHAT: {
+    BASE: "/chat",
+    CONVERSATIONS: "/conversations",
+    START_CONVERSATION: "/conversations/start",
+    UNREAD_COUNT: "/unread-count",
+    MESSAGES: "/messages",
+    GET_MESSAGES: "/messages/:otherUserId",
+    MARK_AS_READ: "/messages/:otherUserId/read",
+    DELETE_MESSAGE: "/messages/:messageId",
+    DELETE_CONVERSATION: "/conversations/:otherUserId",
   },
 };

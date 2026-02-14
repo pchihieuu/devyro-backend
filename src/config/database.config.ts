@@ -9,12 +9,13 @@ import { Company } from "../entities/Company.entity";
 import { Notification } from "../entities/Notification.entity";
 import { RefreshToken } from "../entities/Refreshtoken.entity";
 import { PasswordResetToken } from "../entities/Passwordresettoken.entity";
+import { Message } from "../entities/Message.entity";
+import { Conversation } from "../entities/Conversation.entity";
 
 const isProduction = config.nodeEnv === "production";
 
-
 if (process.env.DATABASE_URL) {
-  const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
+  const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ":****@");
   console.log("DATABASE_URL (masked):", maskedUrl);
 }
 console.log("DB_HOST:", config.database.host);
@@ -48,14 +49,16 @@ const developmentConfig: DataSourceOptions = {
     Notification,
     RefreshToken,
     PasswordResetToken,
+    Message,
+    Conversation,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
 
 const productionConfig: DataSourceOptions = {
   ...baseConfig,
-  ...(process.env.DATABASE_URL 
-    ? { 
+  ...(process.env.DATABASE_URL
+    ? {
         url: process.env.DATABASE_URL,
       }
     : {
@@ -64,8 +67,7 @@ const productionConfig: DataSourceOptions = {
         username: config.database.username,
         password: config.database.password,
         database: config.database.database,
-      }
-  ),
+      }),
   ssl: {
     rejectUnauthorized: false,
   },

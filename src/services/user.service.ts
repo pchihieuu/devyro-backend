@@ -5,6 +5,7 @@ import {
   extractPublicId,
 } from "../utils/cloudinary.utils";
 import { NotFoundError, ForbiddenError } from "../utils/errors";
+import { ILike } from "typeorm";
 
 interface UpdateProfileData {
   name?: string;
@@ -101,7 +102,6 @@ export class UserService {
       throw new NotFoundError("User not found");
     }
 
-   
     return {
       id: user.id,
       name: user.name,
@@ -111,6 +111,42 @@ export class UserService {
       resume: user.resume || "",
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
+   * Search users by name or email (for chat)
+   */
+  async searchUsers(
+    query: string,
+    currentUserId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ users: Partial<User>[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await this.userRepository.findAndCount({
+      where: [
+        { name: ILike(`%${query}%`) },
+        { email: ILike(`%${query}%`) },
+      ],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        role: true,
+      },
+      take: limit,
+      skip,
+    });
+
+    // Filter out current user
+    const filteredUsers = users.filter((user) => user.id !== currentUserId);
+
+    return {
+      users: filteredUsers,
+      total: filteredUsers.length,
     };
   }
 
@@ -128,7 +164,6 @@ export class UserService {
           await deleteFromCloudinary(publicId, resourceType);
         } catch (error) {
           console.error(`Error deleting old ${resourceType}:`, error);
-         
         }
       }
     }

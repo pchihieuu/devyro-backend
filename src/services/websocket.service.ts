@@ -10,12 +10,12 @@ interface AuthenticatedSocket extends Socket {
 
 export class WebSocketService {
   private io: SocketIOServer;
-  private userSockets: Map<string, string> = new Map(); // userId -> socketId
+  private userSockets: Map<string, string> = new Map();
 
   constructor(server: HTTPServer) {
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.CLIENT_URL || "https://job-portal-vn.vercel.app/",
+        origin: process.env.CLIENT_URL,
         credentials: true,
       },
     });
@@ -61,20 +61,34 @@ export class WebSocketService {
 
       if (socket.userId) {
         this.userSockets.set(socket.userId, socket.id);
+        socket.join(`user:${socket.userId}`);
+        
+        // Broadcast online status
+        this.io.emit("user:online", { userId: socket.userId });
       }
+
+      // Handle typing indicator
+      socket.on("typing:start", (data: { receiverId: string }) => {
+        if (socket.userId) {
+          this.io.to(`user:${data.receiverId}`).emit("typing:start", {
+            userId: socket.userId,
+          });
+        }
+      });
+
+      socket.on("typing:stop", (data: { receiverId: string }) => {
+        if (socket.userId) {
+          this.io.to(`user:${data.receiverId}`).emit("typing:stop", {
+            userId: socket.userId,
+          });
+        }
+      });
 
       socket.on("disconnect", () => {
         console.log(`User disconnected: ${socket.userId}`);
         if (socket.userId) {
           this.userSockets.delete(socket.userId);
-        }
-      });
-
-      // Client can request to join their personal room
-      socket.on("join", (userId: string) => {
-        if (socket.userId === userId) {
-          socket.join(`user:${userId}`);
-          console.log(`User ${userId} joined their personal room`);
+          this.io.emit("user:offline", { userId: socket.userId });
         }
       });
     });
@@ -91,16 +105,40 @@ export class WebSocketService {
       createdAt: Date;
     }
   ) {
-    // Send to user's personal room
     this.io.to(`user:${userId}`).emit("notification", notification);
+  }
 
-    // Also send directly to socket if connected
-    const socketId = this.userSockets.get(userId);
-    if (socketId) {
-      this.io.to(socketId).emit("notification", notification);
+  public sendMessageToUser(
+    userId: string,
+    message: {
+      id: string;
+      senderId: string;
+      senderName: string;
+      senderAvatar: string | null;
+      content: string;
+      type: string;
+      fileUrl?: string | null;
+      createdAt: Date;
     }
+  ) {
+    this.io.to(`user:${userId}`).emit("message:new", message);
+  }
 
-    console.log(`Notification sent to user: ${userId}`);
+  /**
+   * Send a generic event to a specific user
+   */
+  public sendToUser(userId: string, event: string, data: any) {
+    this.io.to(`user:${userId}`).emit(event, data);
+  }
+
+  /**
+   * Notify user that a conversation has been deleted
+   */
+  public notifyConversationDeleted(
+    userId: string,
+    data: { otherUserId: string; conversationId: string }
+  ) {
+    this.io.to(`user:${userId}`).emit("conversation:deleted", data);
   }
 
   public getIO() {
