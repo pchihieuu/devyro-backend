@@ -13,7 +13,9 @@
     "migration:create": "npm run typeorm -- migration:create",
     "migration:run": "npm run typeorm -- migration:run -d src/config/database.config.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/database.config.ts",
-    "migration:show": "npm run typeorm -- migration:show -d src/config/database.config.ts"
+    "migration:show": "npm run typeorm -- migration:show -d src/config/database.config.ts",
+    "migration:run:prod": "cross-env NODE_ENV=production typeorm-ts-node-commonjs migration:run -d dist/config/database.config.js",
+    "postbuild": "npm run migration:run:prod"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
