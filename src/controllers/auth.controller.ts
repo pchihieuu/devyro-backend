@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { authService } from "../services/auth.service";
 import { uploadService } from "../services/upload.service";
+import { userService } from "../services/user.service"; // ✅ ADD THIS IMPORT
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS } from "../constants/httpStatus";
 import { BadRequestError, UnauthorizedError } from "../utils/errors";
@@ -106,7 +107,6 @@ export const login = asyncHandler(
         data: userData,
       });
     } catch (error) {
-      // Clear any existing cookie on failed login
       clearRefreshTokenCookie(res);
       throw error;
     }
@@ -144,7 +144,6 @@ export const refreshToken = asyncHandler(
         },
       });
     } catch (error) {
-      // Clear invalid cookie
       clearRefreshTokenCookie(res);
       throw error;
     }
@@ -232,10 +231,18 @@ export const uploadImagePublic = asyncHandler(
       throw new BadRequestError("No file uploaded");
     }
 
+    if (!req.user) {
+      throw new UnauthorizedError("User not authenticated");
+    }
+
     const result = await uploadService.uploadImage(
       req.file.buffer,
       req.file.mimetype
     );
+
+    const updatedUser = await userService.updateProfile(req.user.id, {
+      avatar: result.url,
+    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -254,10 +261,18 @@ export const uploadImage = asyncHandler(
       throw new BadRequestError("No file uploaded");
     }
 
+    if (!req.user) {
+      throw new UnauthorizedError("User not authenticated");
+    }
+
     const result = await uploadService.uploadImage(
       req.file.buffer,
       req.file.mimetype
     );
+
+    const updatedUser = await userService.updateProfile(req.user.id, {
+      avatar: result.url,
+    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -276,18 +291,25 @@ export const uploadResume = asyncHandler(
       throw new BadRequestError("No file uploaded");
     }
 
+    if (!req.user) {
+      throw new UnauthorizedError("User not authenticated");
+    }
+
     const result = await uploadService.uploadResume(
       req.file.buffer,
       req.file.mimetype
     );
 
-    await authService.updateUserResume(req.user!.id, result.url);
+    const updatedUser = await userService.updateProfile(req.user.id, {
+      resume: result.url,
+    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
       message: "Resume uploaded successfully",
       data: {
         resumeUrl: result.url,
+        publicId: result.publicId,
       },
     });
   }
