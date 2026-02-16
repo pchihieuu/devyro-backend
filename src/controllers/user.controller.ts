@@ -10,14 +10,7 @@ export const updateProfile = asyncHandler(
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: HTTP_MESSAGE.UPDATED,
-      data: {
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar || "",
-        role: user.role,
-        resume: user.resume || "",
-      },
+      data: user,
     });
   }
 );
@@ -36,6 +29,17 @@ export const deleteResume = asyncHandler(
 export const getPublicProfile = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const user = await userService.getPublicProfile(req.params.id);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: user,
+    });
+  }
+);
+
+export const getMyProfile = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const user = await userService.getMyProfile(req.user!.id);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -68,6 +72,86 @@ export const searchUsers = asyncHandler(
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: result,
+    });
+  }
+);
+
+export const addExperience = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const user = await userService.addExperience(req.user!.id, req.body);
+
+    res.status(HTTP_STATUS.CREATED).json({
+      success: true,
+      message: "Experience added successfully",
+      data: user.experience,
+    });
+  }
+);
+
+export const updateExperience = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const index = parseInt(req.params.index);
+    const user = await userService.updateExperience(
+      req.user!.id,
+      index,
+      req.body
+    );
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: "Experience updated successfully",
+      data: user.experience,
+    });
+  }
+);
+
+export const deleteExperience = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const index = parseInt(req.params.index);
+    const user = await userService.deleteExperience(req.user!.id, index);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: "Experience deleted successfully",
+      data: user.experience,
+    });
+  }
+);
+
+export const addProject = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const user = await userService.addProject(req.user!.id, req.body);
+
+    res.status(HTTP_STATUS.CREATED).json({
+      success: true,
+      message: "Project added successfully",
+      data: user.projects,
+    });
+  }
+);
+
+export const updateProject = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const index = parseInt(req.params.index);
+    const user = await userService.updateProject(req.user!.id, index, req.body);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: "Project updated successfully",
+      data: user.projects,
+    });
+  }
+);
+
+export const deleteProject = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const index = parseInt(req.params.index);
+    const user = await userService.deleteProject(req.user!.id, index);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: "Project deleted successfully",
+      data: user.projects,
     });
   }
 );

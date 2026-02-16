@@ -23,9 +23,14 @@ export const ROUTES = {
   USERS: {
     BASE: "/users",
     BY_ID: "/:id",
+    MY_PROFILE: "/me",
     UPDATE_PROFILE: "/profile",
     DELETE_RESUME: "/resume",
     SEARCH: "/search",
+    EXPERIENCE: "/experience",
+    EXPERIENCE_BY_INDEX: "/experience/:index",
+    PROJECTS: "/projects",
+    PROJECT_BY_INDEX: "/projects/:index",
   },
   JOBS: {
     BASE: "/jobs",

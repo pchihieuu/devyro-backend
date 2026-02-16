@@ -19,6 +19,35 @@ export enum UserRole {
   EMPLOYER = "employer",
 }
 
+export enum WorkPreference {
+  ONSITE = "onsite",
+  REMOTE = "remote",
+  HYBRID = "hybrid",
+}
+
+export enum AvailabilityStatus {
+  AVAILABLE = "available",
+  BUSY = "busy",
+  UNAVAILABLE = "unavailable",
+}
+
+interface Experience {
+  title: string;
+  company: string;
+  companyLink?: string;
+  description: string;
+  startDate: string;
+  endDate?: string;
+}
+
+interface Project {
+  title: string;
+  description: string;
+  technologies: string[];
+  link?: string;
+  image?: string;
+}
+
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn("uuid")
@@ -44,6 +73,63 @@ export class User {
 
   @Column({ type: "varchar", nullable: true })
   resume: string | null;
+
+  // New profile fields
+  @Column({ type: "varchar", length: 50, unique: true, nullable: true })
+  username: string | null;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  title: string | null;
+
+  @Column({ type: "text", nullable: true })
+  bio: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  location: string | null;
+
+  @Column({
+    type: "enum",
+    enum: WorkPreference,
+    nullable: true,
+  })
+  workPreference: WorkPreference | null;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  hourlyRateMin: number | null;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  hourlyRateMax: number | null;
+
+  @Column({ type: "int", default: 0 })
+  completionRate: number;
+
+  @Column({ type: "int", default: 0 })
+  totalProjects: number;
+
+  @Column({ type: "int", default: 2 })
+  responseTimeHours: number;
+
+  @Column({
+    type: "enum",
+    enum: AvailabilityStatus,
+    default: AvailabilityStatus.AVAILABLE,
+  })
+  availabilityStatus: AvailabilityStatus;
+
+  @Column({ type: "simple-array", nullable: true })
+  skills: string[];
+
+  @Column({ type: "json", nullable: true })
+  experience: Experience[];
+
+  @Column({ type: "json", nullable: true })
+  projects: Project[];
+
+  @Column({ type: "decimal", precision: 3, scale: 2, default: 0 })
+  rating: number;
+
+  @Column({ type: "int", default: 0 })
+  reviewCount: number;
 
   @CreateDateColumn()
   createdAt: Date;
