@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { authService } from "../services/auth.service";
 import { uploadService } from "../services/upload.service";
-import { userService } from "../services/user.service"; // ✅ ADD THIS IMPORT
+import { userService } from "../services/user.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS } from "../constants/httpStatus";
 import { BadRequestError, UnauthorizedError } from "../utils/errors";
