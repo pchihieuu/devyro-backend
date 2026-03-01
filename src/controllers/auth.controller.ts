@@ -231,18 +231,10 @@ export const uploadImagePublic = asyncHandler(
       throw new BadRequestError("No file uploaded");
     }
 
-    if (!req.user) {
-      throw new UnauthorizedError("User not authenticated");
-    }
-
     const result = await uploadService.uploadImage(
       req.file.buffer,
       req.file.mimetype
     );
-
-    const updatedUser = await userService.updateProfile(req.user.id, {
-      avatar: result.url,
-    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
