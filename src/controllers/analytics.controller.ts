@@ -17,6 +17,7 @@ export const getEmployerAnalytics = asyncHandler(
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
+      counts: analytics.counts,
       data: analytics,
     });
   }
