@@ -145,22 +145,31 @@ export class AnalyticsService {
         ? await this.applicationRepository.find({
             where: { jobId: In(jobIds) },
             relations: ["applicant", "job"],
-            select: {
-              applicant: {
-                id: true,
-                name: true,
-                email: true,
-                avatar: true,
-              },
-              job: {
-                id: true,
-                title: true,
-              },
-            },
             order: { createdAt: "DESC" },
             take: 5,
           })
         : [];
+
+    const mappedApplications = recentApplications.map((app) => ({
+      id: app.id,
+      status: app.status,
+      updatedAt: app.updatedAt,
+      createdAt: app.createdAt,
+      applicant: app.applicant
+        ? {
+            id: app.applicant.id,
+            name: app.applicant.name,
+            email: app.applicant.email,
+            avatar: app.applicant.avatar,
+          }
+        : null,
+      job: app.job
+        ? {
+            id: app.job.id,
+            title: app.job.title,
+          }
+        : null,
+    }));
 
     return {
       counts: {
@@ -175,7 +184,7 @@ export class AnalyticsService {
       },
       data: {
         recentJobs,
-        recentApplications,
+        recentApplications: mappedApplications,
       },
     };
   }
