@@ -11,7 +11,7 @@ export const registerSchema = z.object({
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
         "Password must contain at least one uppercase letter, one lowercase letter, and one number"
       ),
-    avatar: z.string().url().optional(),
+    avatar: z.string().url().optional().or(z.literal("")),
     role: z.enum(["jobseeker", "employer"]),
   }),
 });
@@ -23,11 +23,7 @@ export const loginSchema = z.object({
   }),
 });
 
-export const refreshTokenSchema = z.object({
-  cookies: z.object({
-    refreshToken: z.string().min(1, "Refresh token is required"),
-  }),
-});
+export const refreshTokenSchema = z.object({});
 
 export const forgotPasswordSchema = z.object({
   body: z.object({

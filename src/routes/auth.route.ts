@@ -8,7 +8,6 @@ import {
 import {
   registerSchema,
   loginSchema,
-  refreshTokenSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyResetTokenSchema,
@@ -43,12 +42,7 @@ router.post(
 
 router.post(ROUTES.AUTH.LOGIN, authLimiter, validate(loginSchema), login);
 
-router.post(
-  ROUTES.AUTH.REFRESH_TOKEN,
-  authLimiter,
-  validate(refreshTokenSchema),
-  refreshToken
-);
+router.post(ROUTES.AUTH.REFRESH_TOKEN, authLimiter, refreshToken);
 
 router.post(
   ROUTES.AUTH.UPLOAD_IMAGE_PUBLIC,
