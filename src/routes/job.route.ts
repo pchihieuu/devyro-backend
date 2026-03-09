@@ -14,6 +14,7 @@ import { ROUTES } from "../constants/routes";
 const router = Router();
 
 router.get(ROUTES.JOBS.EMPLOYER_JOBS, protect, getJobsEmployer);
+router.patch(ROUTES.JOBS.TOGGLE_CLOSE, protect, toggleCloseJob);
 
 router.route("/").post(protect, createJob).get(getJobs);
 
@@ -23,6 +24,5 @@ router
   .put(protect, updateJob)
   .delete(protect, deleteJob);
 
-router.put(ROUTES.JOBS.TOGGLE_CLOSE, protect, toggleCloseJob);
 
 export default router;
