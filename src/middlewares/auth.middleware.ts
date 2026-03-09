@@ -51,7 +51,7 @@ export const protect = async (
     next();
   } catch (error) {
     // Check if token is expired
-    if (error instanceof Error && error.message.includes("expired")) {
+    if (error instanceof Error && error.message === "TOKEN_EXPIRED") {
       res.status(401).json({
         success: false,
         message: "Access token expired",
