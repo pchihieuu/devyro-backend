@@ -69,6 +69,7 @@ export const ROUTES = {
     BY_ID: "/:id",
     MY: "/my",
     JOBS: "/:id/jobs",
+    UPLOAD_LOGO: "/upload-logo",
   },
   CHAT: {
     BASE: "/chat",

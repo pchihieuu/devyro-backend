@@ -15,8 +15,11 @@ import {
   getCompanyJobs,
   updateCompany,
   deleteCompany,
+  uploadCompanyLogo,
 } from "../controllers/company.controller";
 import { ROUTES } from "../constants/routes";
+import { uploadLimiter } from "../middlewares/rateLimiter.middleware";
+import upload from "../middlewares/upload.middleware";
 
 const router = Router();
 
@@ -48,5 +51,7 @@ router.put(
 );
 
 router.delete(ROUTES.COMPANIES.BY_ID, protect, deleteCompany);
+
+router.post(ROUTES.COMPANIES.UPLOAD_LOGO, protect, uploadLimiter, upload.single("image"), uploadCompanyLogo)
 
 export default router;

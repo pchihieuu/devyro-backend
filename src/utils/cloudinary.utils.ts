@@ -17,12 +17,6 @@ export const uploadToCloudinary = (
       access_mode: "public",
     };
 
-    if (resourceType === "image") {
-      uploadOptions.transformation = [
-        { width: 1000, height: 1000, crop: "limit" },
-      ];
-    }
-
     if (resourceType === "raw") {
       uploadOptions.format = "pdf";
     }
