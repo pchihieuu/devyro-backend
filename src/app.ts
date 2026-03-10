@@ -49,7 +49,7 @@ app.use(cookieParser());
 
 app.set("trust proxy", 1);
 
-app.get("/", (req, res) => {
+app.get(`${API_PREFIX}${ROUTES.HEALTH.CHECK}`, (req, res) => {
   res.json({
     success: true,
     message: "Job Portal API is running",
