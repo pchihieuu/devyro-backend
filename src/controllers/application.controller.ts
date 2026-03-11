@@ -3,7 +3,7 @@ import { applicationService } from "../services/application.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { BadRequestError, ForbiddenError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
-import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { HTTP_STATUS } from "../constants/httpStatus";
 import { ApplicationStatus } from "../entities/Application.entity";
 
 export const applyToJob = asyncHandler(
@@ -34,16 +34,44 @@ export const applyToJob = asyncHandler(
 
 export const getMyApplications = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const applications = await applicationService.getMyApplications(
-      req.user!.id
+    const {
+      page = "1",
+      limit = "12",
+      sortBy = "createdAt",
+      order = "desc",
+      status,
+    } = req.query as {
+      page?: string;
+      limit: string;
+      sortBy: string;
+      order: string;
+      status?: string;
+    };
+
+    const pagination = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sortBy,
+      order: order.toUpperCase() as "ASC" | "DESC",
+      status: status || undefined,
+    };
+
+    const result = await applicationService.getMyApplications(
+      req.user!.id,
+      pagination
     );
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: "Applications retrieved successfully",
-      data: applications,
-      meta: {
-        total: applications.length,
+      data: result.applications,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalApplications: result.total,
+        limit: pagination.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
       },
     });
   }
@@ -128,7 +156,6 @@ export const withdrawApplication = asyncHandler(
     });
   }
 );
-
 
 export const triggerAIAnalysis = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
