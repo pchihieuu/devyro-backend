@@ -16,6 +16,8 @@ export enum ApplicationStatus {
   IN_REVIEW = "In Review",
   REJECTED = "Rejected",
   ACCEPTED = "Accepted",
+  WITHDRAWN = "Withdrawn",
+  INTERVIEW = "Interview",
 }
 
 export interface AIMatchingAnalysis {
@@ -56,26 +58,26 @@ export class Application {
   })
   status: ApplicationStatus;
 
-  @Column({ 
-    type: "decimal", 
-    precision: 5, 
-    scale: 2, 
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
     nullable: true,
-    comment: "AI-generated matching score (0-100)"
+    comment: "AI-generated matching score (0-100)",
   })
   aiMatchingScore: number;
 
-  @Column({ 
-    type: "jsonb", 
+  @Column({
+    type: "jsonb",
     nullable: true,
-    comment: "Detailed AI analysis"
+    comment: "Detailed AI analysis",
   })
   aiMatchingAnalysis: AIMatchingAnalysis;
 
-  @Column({ 
-    type: "timestamp", 
+  @Column({
+    type: "timestamp",
     nullable: true,
-    comment: "Timestamp when AI analysis was performed"
+    comment: "Timestamp when AI analysis was performed",
   })
   aiAnalyzedAt: Date;
 

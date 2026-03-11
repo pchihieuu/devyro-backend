@@ -13,6 +13,14 @@ import { notificationService } from "./notification.service";
 import { geminiAIMatchingService } from "./geminiaimatching.service";
 import { cleanResumeText, extractPDFText } from "../utils/pdfextractor.utils";
 
+interface PaginationOptions {
+  page: number;
+  limit: number;
+  sortBy: string;
+  order: "ASC" | "DESC";
+  status?: string;
+}
+
 export class ApplicationService {
   private applicationRepository = AppDataSource.getRepository(Application);
   private jobRepository = AppDataSource.getRepository(Job);
@@ -75,7 +83,6 @@ export class ApplicationService {
           savedApplication.id,
           error
         );
-       
       }
     );
 
@@ -108,7 +115,6 @@ export class ApplicationService {
     job: Job
   ): Promise<void> {
     try {
-
       let resumeText: string;
 
       try {
@@ -216,22 +222,54 @@ export class ApplicationService {
   /**
    * Get applicant's applications
    */
-  async getMyApplications(applicantId: string): Promise<Application[]> {
-    return await this.applicationRepository.find({
-      where: { applicantId },
-      relations: ["job", "job.company"],
-      select: {
-        job: {
-          id: true,
-          title: true,
-          location: true,
-          type: true,
-          companyId: true,
-          isClosed: true,
+  async getMyApplications(
+    applicantId: string,
+    pagination: PaginationOptions
+  ): Promise<{
+    applications: Application[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const { page, limit, sortBy, order, status } = pagination;
+    const skip = (page - 1) * limit;
+
+    const where: any = { applicantId };
+    if (status) {
+      const enumValue = Object.values(ApplicationStatus).find(
+        (v) => v === status
+      );
+      if (enumValue) {
+        where.status = enumValue;
+      }
+    }
+
+    const [applications, total] = await this.applicationRepository.findAndCount(
+      {
+        where,
+        relations: ["job", "job.company"],
+        select: {
+          job: {
+            id: true,
+            title: true,
+            location: true,
+            type: true,
+            companyId: true,
+            isClosed: true,
+          },
         },
-      },
-      order: { createdAt: "DESC" },
-    });
+        order: { [sortBy]: order },
+        skip,
+        take: limit,
+      }
+    );
+
+    return {
+      applications,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   /**
@@ -352,10 +390,14 @@ export class ApplicationService {
       throw new ForbiddenError("Not authorized to update this application");
     }
 
-    if (
-      application.status === ApplicationStatus.ACCEPTED ||
-      application.status === ApplicationStatus.REJECTED
-    ) {
+    // Employer cannot change a withdrawn application
+    const lockedStatuses = [
+      ApplicationStatus.ACCEPTED,
+      ApplicationStatus.REJECTED,
+      ApplicationStatus.WITHDRAWN,
+    ];
+
+    if (lockedStatuses.includes(application.status)) {
       throw new BadRequestError(
         `Cannot update application that is already ${application.status.toLowerCase()}`
       );
@@ -365,7 +407,6 @@ export class ApplicationService {
     application.status = status;
     await this.applicationRepository.save(application);
 
-    // Send notification with jobId, only if status changed
     if (oldStatus !== status) {
       await notificationService.notifyApplicationStatusChanged(
         application.applicantId,
@@ -377,10 +418,7 @@ export class ApplicationService {
       );
     }
 
-    return {
-      message: "Application status updated successfully",
-      status,
-    };
+    return { message: "Application status updated successfully", status };
   }
 
   async withdrawApplication(
@@ -407,7 +445,8 @@ export class ApplicationService {
       );
     }
 
-    await this.applicationRepository.softDelete(applicationId);
+    application.status = ApplicationStatus.WITHDRAWN;
+    await this.applicationRepository.save(application);
 
     return {
       message: "Application withdrawn successfully",

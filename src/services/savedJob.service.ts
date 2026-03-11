@@ -2,6 +2,12 @@ import { AppDataSource } from "../config/database.config";
 import { SavedJob } from "../entities/SavedJob.entity";
 import { ConflictError } from "../utils/errors";
 
+interface PaginationOptions {
+  page: number;
+  limit: number;
+  sortBy: string;
+  order: "ASC" | "DESC";
+}
 export class SavedJobService {
   private savedJobRepository = AppDataSource.getRepository(SavedJob);
 
@@ -38,8 +44,19 @@ export class SavedJobService {
     });
   }
 
-  async getMySavedJobs(jobseekerId: string): Promise<SavedJob[]> {
-    return await this.savedJobRepository.find({
+  async getMySavedJobs(
+    jobseekerId: string,
+    pagination: PaginationOptions
+  ): Promise<{
+    savedJobs: SavedJob[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const { page, limit, sortBy, order } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [savedJobs, total] = await this.savedJobRepository.findAndCount({
       where: { jobseekerId },
       relations: ["job", "job.company"],
       select: {
@@ -58,8 +75,16 @@ export class SavedJobService {
           updatedAt: true,
         },
       },
-      order: { createdAt: "DESC" },
+      order: { [sortBy]: order },
+      skip,
+      take: limit,
     });
+    return {
+      savedJobs,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
 

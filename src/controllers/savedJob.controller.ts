@@ -31,11 +31,40 @@ export const unsaveJob = asyncHandler(
 
 export const getMySavedJobs = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const savedJobs = await savedJobService.getMySavedJobs(req.user!.id);
+    const {
+      page = "1",
+      limit = "12",
+      sortBy = "createdAt",
+      order = "desc",
+    } = req.query as {
+      page?: string;
+      limit?: string;
+      sortBy?: string;
+      order?: string;
+    };
+
+    const pagination = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sortBy,
+      order: order.toUpperCase() as "ASC" | "DESC",
+    };
+    const result = await savedJobService.getMySavedJobs(
+      req.user!.id,
+      pagination
+    );
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: savedJobs,
+      data: result.savedJobs,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalSavedJobs: result.total,
+        limit: pagination.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
     });
   }
 );
