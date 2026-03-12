@@ -3,6 +3,8 @@ import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
 import {
   authLimiter,
+  publicUploadLimiter,
+  refreshTokenLimiter,
   uploadLimiter,
 } from "../middlewares/rateLimiter.middleware";
 import {
@@ -42,11 +44,11 @@ router.post(
 
 router.post(ROUTES.AUTH.LOGIN, authLimiter, validate(loginSchema), login);
 
-router.post(ROUTES.AUTH.REFRESH_TOKEN, authLimiter, refreshToken);
+router.post(ROUTES.AUTH.REFRESH_TOKEN, refreshTokenLimiter, refreshToken);
 
 router.post(
   ROUTES.AUTH.UPLOAD_IMAGE_PUBLIC,
-  uploadLimiter,
+  publicUploadLimiter,
   upload.single("image"),
   uploadImagePublic
 );

@@ -1,10 +1,19 @@
 import { AppDataSource } from "../config/database.config";
-import { User, UserRole, WorkPreference, AvailabilityStatus } from "../entities/User.entity";
+import {
+  User,
+  UserRole,
+  WorkPreference,
+  AvailabilityStatus,
+} from "../entities/User.entity";
 import {
   deleteFromCloudinary,
   extractPublicId,
 } from "../utils/cloudinary.utils";
-import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
+import {
+  NotFoundError,
+  ForbiddenError,
+  BadRequestError,
+} from "../utils/errors";
 import { ILike, Not } from "typeorm";
 
 interface UpdateProfileData {
@@ -44,7 +53,7 @@ export class UserService {
   /**
    * Update user profile (comprehensive)
    */
-  async updateProfile(userId: string, data: UpdateProfileData): Promise<User> {
+  async updateProfile(userId: string, data: UpdateProfileData): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -63,9 +72,9 @@ export class UserService {
       if (data.username.trim() !== "") {
         // Check if username is already taken by another user
         const existingUser = await this.userRepository.findOne({
-          where: { 
+          where: {
             username: data.username,
-            id: Not(userId)
+            id: Not(userId),
           },
         });
 
@@ -150,7 +159,7 @@ export class UserService {
 
     await this.userRepository.save(user);
 
-    return user;
+    return this.getMyProfile(userId);
   }
 
   /**
@@ -221,15 +230,39 @@ export class UserService {
   /**
    * Get own profile (authenticated user)
    */
-  async getMyProfile(userId: string): Promise<User> {
+  async getMyProfile(userId: string): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ["company"],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatar: true,
+        resume: true,
+        username: true,
+        title: true,
+        bio: true,
+        location: true,
+        workPreference: true,
+        hourlyRateMin: true,
+        hourlyRateMax: true,
+        completionRate: true,
+        totalProjects: true,
+        responseTimeHours: true,
+        availabilityStatus: true,
+        skills: true,
+        experience: true,
+        projects: true,
+        rating: true,
+        reviewCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    if (!user) throw new NotFoundError("User not found");
 
     return user;
   }
@@ -466,6 +499,52 @@ export class UserService {
         }
       }
     }
+  }
+
+  /**
+   * Update avatar only - optimized single query
+   */
+  async updateAvatar(userId: string, newAvatarUrl: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ["id", "avatar"], // Chỉ lấy field cần thiết
+    });
+
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    // Xóa ảnh cũ trên Cloudinary nếu khác ảnh mới
+    if (user.avatar && user.avatar !== newAvatarUrl) {
+      await this.deleteOldFile(user.avatar, "image");
+    }
+
+    await this.userRepository.update(userId, { avatar: newAvatarUrl });
+  }
+
+  /**
+   * Update resume only - optimized single query
+   */
+  async updateResume(userId: string, newResumeUrl: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ["id", "resume", "role"], // Chỉ lấy field cần thiết
+    });
+
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    if (user.role !== UserRole.JOBSEEKER) {
+      throw new ForbiddenError("Only jobseekers can update resume");
+    }
+
+    // Xóa resume cũ trên Cloudinary nếu khác resume mới
+    if (user.resume && user.resume !== newResumeUrl) {
+      await this.deleteOldFile(user.resume, "raw");
+    }
+
+    await this.userRepository.update(userId, { resume: newResumeUrl });
   }
 }
 
