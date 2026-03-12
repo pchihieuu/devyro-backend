@@ -588,7 +588,10 @@ export class AuthService {
     const { email, password, deviceInfo, ipAddress } = data;
 
     // Find user
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: ["id", "name", "email", "password", "avatar", "role", "resume"],
+    });
     if (!user) {
       throw new UnauthorizedError("Invalid email or password");
     }
@@ -756,30 +759,26 @@ export class AuthService {
   async resetPassword(data: ResetPasswordData): Promise<void> {
     const { token, newPassword } = data;
 
-    // Find and validate token
     const resetToken = await this.findAndValidateResetToken(token);
+    const userId = resetToken.user.id;
 
-    // Get user
-    const user = resetToken.user;
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ["id", "email", "name", "password", "role"],
+    });
 
-    // Hash new password
-    const hashedPassword = await PasswordUtils.hash(newPassword);
+    if (!user) throw new NotFoundError("User not found");
 
-    // Update password
-    user.password = hashedPassword;
+    user.password = await PasswordUtils.hash(newPassword);
     await this.userRepository.save(user);
 
-    // Mark token as used
     resetToken.isUsed = true;
     await this.passwordResetTokenRepository.save(resetToken);
 
-    // Logout from all devices (security measure)
     await this.logoutAll(user.id);
 
-    // Send confirmation email
     this.sendPasswordChangedEmailAsync(user.email, user.name);
   }
-
   /**
    * Verify reset token validity
    */

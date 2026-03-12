@@ -218,9 +218,14 @@ export const revokeSession = asyncHandler(
 
 export const getMe = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError("User not authenticated");
+    }
+    const user = await userService.getMyProfile(req.user.id);
+
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: req.user,
+      data: user,
     });
   }
 );
@@ -249,22 +254,13 @@ export const uploadImagePublic = asyncHandler(
 
 export const uploadImage = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    if (!req.file) {
-      throw new BadRequestError("No file uploaded");
-    }
-
-    if (!req.user) {
-      throw new UnauthorizedError("User not authenticated");
-    }
+    if (!req.file) throw new BadRequestError("No file uploaded");
+    if (!req.user) throw new UnauthorizedError("User not authenticated");
 
     const result = await uploadService.uploadImage(
       req.file.buffer,
       req.file.mimetype
     );
-
-    const updatedUser = await userService.updateProfile(req.user.id, {
-      avatar: result.url,
-    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -274,27 +270,22 @@ export const uploadImage = asyncHandler(
         publicId: result.publicId,
       },
     });
+
+    userService.updateAvatar(req.user.id, result.url).catch((err) => {
+      console.error("Failed to update user avatar:", err);
+    });
   }
 );
 
 export const uploadResume = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    if (!req.file) {
-      throw new BadRequestError("No file uploaded");
-    }
-
-    if (!req.user) {
-      throw new UnauthorizedError("User not authenticated");
-    }
+    if (!req.file) throw new BadRequestError("No file uploaded");
+    if (!req.user) throw new UnauthorizedError("User not authenticated");
 
     const result = await uploadService.uploadResume(
       req.file.buffer,
       req.file.mimetype
     );
-
-    const updatedUser = await userService.updateProfile(req.user.id, {
-      resume: result.url,
-    });
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -303,6 +294,10 @@ export const uploadResume = asyncHandler(
         resumeUrl: result.url,
         publicId: result.publicId,
       },
+    });
+
+    userService.updateResume(req.user.id, result.url).catch((err) => {
+      console.error("Failed to update user resume:", err);
     });
   }
 );
