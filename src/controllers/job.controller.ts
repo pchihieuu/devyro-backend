@@ -43,21 +43,23 @@ export const getJobs = asyncHandler(
       level,
       minSalary,
       maxSalary,
+      skills,
       userId,
       page = "1",
       limit = "12",
       sortBy = "createdAt",
       order = "desc",
-    } = req.query as JobFilterQuery;
+    } = req.query as JobFilterQuery & { skills?: string | string[] };
 
     const filters = {
       keyword,
       location,
       category,
       type,
-      level, 
+      level,
       minSalary,
       maxSalary,
+      skills,
       userId,
     };
 
