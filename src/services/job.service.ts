@@ -14,6 +14,7 @@ interface JobFilters {
   level?: string;
   minSalary?: string;
   maxSalary?: string;
+  skills?: string | string[];
   userId?: string;
 }
 
@@ -94,7 +95,6 @@ export class JobService {
     if (filters.minSalary && filters.maxSalary) {
       const minSalary = Number(filters.minSalary);
       const maxSalary = Number(filters.maxSalary);
- 
       where.salaryMax = MoreThanOrEqual(minSalary);
       where.salaryMin = LessThanOrEqual(maxSalary);
     } else if (filters.minSalary) {
@@ -103,22 +103,105 @@ export class JobService {
       where.salaryMin = LessThanOrEqual(Number(filters.maxSalary));
     }
 
-    const [jobs, total] = await this.jobRepository.findAndCount({
-      where,
-      relations: ["company", "company.employer"],
-      select: {
-        company: {
-          id: true,
-          name: true,
-          logo: true,
-          industry: true,
-          size: true,
+    const skillList: string[] = filters.skills
+      ? (Array.isArray(filters.skills)
+          ? filters.skills
+          : [filters.skills]
+        ).filter(Boolean)
+      : [];
+
+    let jobs: Job[];
+    let total: number;
+
+    if (skillList.length > 0) {
+      // Use QueryBuilder so we can add one LIKE per skill (AND logic —
+      // jobs must contain ALL selected skills)
+      const qb = this.jobRepository
+        .createQueryBuilder("job")
+        .leftJoinAndSelect("job.company", "company")
+        .leftJoinAndSelect("company.employer", "employer")
+        .select([
+          "job",
+          "company.id",
+          "company.name",
+          "company.logo",
+          "company.industry",
+          "company.size",
+        ])
+        .where("job.isClosed = :isClosed", { isClosed: false });
+
+      if (filters.keyword)
+        qb.andWhere("job.title ILIKE :keyword", {
+          keyword: `%${filters.keyword}%`,
+        });
+      if (filters.location)
+        qb.andWhere("job.location ILIKE :location", {
+          location: `%${filters.location}%`,
+        });
+      if (filters.category) {
+        const cats = Array.isArray(filters.category)
+          ? filters.category
+          : [filters.category];
+        qb.andWhere("job.category IN (:...categories)", { categories: cats });
+      }
+      if (filters.type) {
+        const types = Array.isArray(filters.type)
+          ? filters.type
+          : [filters.type];
+        qb.andWhere("job.type IN (:...types)", { types });
+      }
+      if (filters.level)
+        qb.andWhere("job.level = :level", { level: filters.level });
+      if (filters.minSalary && filters.maxSalary) {
+        qb.andWhere(
+          "job.salaryMax >= :minSalary AND job.salaryMin <= :maxSalary",
+          {
+            minSalary: Number(filters.minSalary),
+            maxSalary: Number(filters.maxSalary),
+          }
+        );
+      } else if (filters.minSalary) {
+        qb.andWhere("job.salaryMax >= :minSalary", {
+          minSalary: Number(filters.minSalary),
+        });
+      } else if (filters.maxSalary) {
+        qb.andWhere("job.salaryMin <= :maxSalary", {
+          maxSalary: Number(filters.maxSalary),
+        });
+      }
+
+      skillList.forEach((skill, i) => {
+        const paramKey = `skill_${i}`;
+        qb.andWhere(
+          `(job.skills ILIKE :${paramKey}_start OR job.skills ILIKE :${paramKey}_middle OR job.skills ILIKE :${paramKey}_exact)`,
+          {
+            [`${paramKey}_start`]: `${skill},%`,
+            [`${paramKey}_middle`]: `%,${skill},%`,
+            [`${paramKey}_exact`]: skill,
+          }
+        );
+      });
+
+      qb.orderBy(`job.${sortBy}`, order).skip(skip).take(limit);
+      [jobs, total] = await qb.getManyAndCount();
+    } else {
+      [jobs, total] = await this.jobRepository.findAndCount({
+        where,
+        relations: ["company", "company.employer"],
+        select: {
+          company: {
+            id: true,
+            name: true,
+            logo: true,
+            industry: true,
+            size: true,
+          },
         },
-      },
-      order: { [sortBy]: order },
-      skip,
-      take: limit,
-    });
+        order: { [sortBy]: order },
+        skip,
+        take: limit,
+      });
+    }
 
     let jobsWithExtras = jobs;
 
