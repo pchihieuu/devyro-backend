@@ -12,7 +12,7 @@ export const registerSchema = z.object({
         "Password must contain at least one uppercase letter, one lowercase letter, and one number"
       ),
     avatar: z.string().url().optional().or(z.literal("")),
-    role: z.enum(["jobseeker", "employer"]),
+    role: z.enum(["jobseeker", "employer", "admin"]),
   }),
 });
 

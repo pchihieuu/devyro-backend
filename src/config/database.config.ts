@@ -11,6 +11,10 @@ import { RefreshToken } from "../entities/Refreshtoken.entity";
 import { PasswordResetToken } from "../entities/Passwordresettoken.entity";
 import { Message } from "../entities/Message.entity";
 import { Conversation } from "../entities/Conversation.entity";
+import { BlogCategory } from "../entities/BlogCategory.entity";
+import { BlogPost } from "../entities/BlogPost.entity";
+import { BlogPostView } from "../entities/BlogPostView.entity";
+import { BlogTag } from "../entities/BlogTag.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -51,6 +55,10 @@ const developmentConfig: DataSourceOptions = {
     PasswordResetToken,
     Message,
     Conversation,
+    BlogCategory,
+    BlogPost,
+    BlogPostView,
+    BlogTag,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
