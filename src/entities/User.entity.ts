@@ -17,6 +17,7 @@ import { Notification } from "./Notification.entity";
 export enum UserRole {
   JOBSEEKER = "jobseeker",
   EMPLOYER = "employer",
+  ADMIN = "admin",
 }
 
 export enum WorkPreference {

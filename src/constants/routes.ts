@@ -85,4 +85,20 @@ export const ROUTES = {
     DELETE_MESSAGE: "/messages/:messageId",
     DELETE_CONVERSATION: "/conversations/:otherUserId",
   },
+  BLOGS: {
+    BASE: "/blogs",
+    BY_SLUG: "/:slug",
+    RELATED: "/related/:id",
+    LATEST: "/latest",
+    CATEGORIES: "/categories",
+
+    ADMIN: {
+      POSTS: "/admin/posts",
+      POST_BY_ID: "/admin/posts/:id",
+      UPLOAD_IMAGE: "/admin/posts/upload-image",
+
+      CATEGORIES: "/admin/categories",
+      CATEGORY_BY_ID: "/admin/categories/:id",
+    },
+  },
 };

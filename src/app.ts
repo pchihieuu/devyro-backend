@@ -10,6 +10,7 @@ import savedJobRoutes from "./routes/savedJob.route";
 import companyRoutes from "./routes/company.route";
 import notificationRoutes from "./routes/notification.route";
 import chatRoutes from "./routes/chat.routes";
+import blogRoutes from "./routes/blog.route";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { API_PREFIX, ROUTES } from "./constants/routes";
 import helmet from "helmet";
@@ -66,6 +67,7 @@ app.use(`${API_PREFIX}${ROUTES.ANALYTICS.BASE}`, analyticsRoutes);
 app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
 app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
 app.use(`${API_PREFIX}${ROUTES.CHAT.BASE}`, chatRoutes);
+app.use(`${API_PREFIX}${ROUTES.BLOGS.BASE}`, blogRoutes);
 app.use(notFoundHandler);
 
 app.use(errorHandler);
