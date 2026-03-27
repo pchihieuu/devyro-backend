@@ -68,7 +68,7 @@ export class BlogService {
       qb.andWhere("tags.slug = :tag", { tag });
     }
     if (search) {
-      qb.andWhere("(post.title LIKE :s OR post.excerpt LIKE :s)", {
+      qb.andWhere("(post.title ILIKE :s OR post.excerpt ILIKE :s)", {
         s: `%${search}%`,
       });
     }
@@ -270,7 +270,7 @@ export class BlogService {
       .take(limit);
 
     if (status) qb.andWhere("post.status = :status", { status });
-    if (search) qb.andWhere("post.title LIKE :s", { s: `%${search}%` });
+    if (search) qb.andWhere("post.title ILIKE :s", { s: `%${search}%` });
 
     const [posts, total] = await qb.getManyAndCount();
     return { posts, total, page, limit, totalPages: Math.ceil(total / limit) };
