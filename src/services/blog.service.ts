@@ -1,175 +1,118 @@
+// src/services/blog.service.ts
 import slugify from "slugify";
-import { AppDataSource } from "../config/database.config";
-import { BlogCategory } from "../entities/BlogCategory.entity";
+import { BlogRepository } from "../repositories/blog.repository";
+import { BlogSearchQuery } from "../queries/BlogSearchQuery";
 import { BlogPost, BlogPostStatus } from "../entities/BlogPost.entity";
-import { BlogPostView } from "../entities/BlogPostView.entity";
-import { BlogTag } from "../entities/BlogTag.entity";
+import { BlogCategory } from "../entities/BlogCategory.entity";
+import { AppDataSource } from "../config/database.config";
 import { NotFoundError } from "../utils/errors";
 
 export class BlogService {
-  private postRepository = AppDataSource.getRepository(BlogPost);
-  private tagRepository = AppDataSource.getRepository(BlogTag);
-  private viewRepository = AppDataSource.getRepository(BlogPostView);
-  private categoryRepository = AppDataSource.getRepository(BlogCategory);
+  private categoryRepo = AppDataSource.getRepository(BlogCategory);
 
+  constructor(
+    private readonly blogRepo: BlogRepository,
+    private readonly viewTracker: ViewTrackingService
+  ) {}
+
+  // helpers
   private makeSlug(text: string): string {
     return slugify(text, { lower: true, strict: true, locale: "vi" });
   }
 
-  private async findOrCreateTags(names: string[]): Promise<BlogTag[]> {
-    const tags: BlogTag[] = [];
-    for (const name of names) {
-      const slug = this.makeSlug(name);
-      let tag = await this.tagRepository.findOne({ where: { slug } });
-      if (!tag) {
-        tag = this.tagRepository.create({ name: name.trim(), slug });
-        await this.tagRepository.save(tag);
-      }
-      tags.push(tag);
-    }
-    return tags;
-  }
-
   private async uniqueSlug(title: string, excludeId?: string): Promise<string> {
-    let slug = this.makeSlug(title);
-    const exists = await this.postRepository.findOne({
-      where: { slug },
-      withDeleted: true,
-    });
-
-    if (exists && exists.id !== excludeId) {
-      slug = `${slug}-${Date.now()}`;
-    }
-    return slug;
+    const base = this.makeSlug(title);
+    const taken = await this.blogRepo.slugExists(base, excludeId);
+    return taken ? `${base}-${Date.now()}` : base;
   }
 
-  async listPublished(query: {
+  private sanitizePost(post: BlogPost) {
+    const { author, ...rest } = post as any;
+    return {
+      ...rest,
+      author: author
+        ? { id: author.id, name: author.name, avatar: author.avatar }
+        : null,
+    };
+  }
+
+  private paginate(total: number, page: number, limit: number) {
+    return { total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  // public
+  async listPublished(filter: {
     page: number;
     limit: number;
     category?: string;
     tag?: string;
     search?: string;
   }) {
-    const { page, limit, category, tag, search } = query;
-    const qb = this.postRepository
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.category", "category")
-      .leftJoinAndSelect("post.tags", "tags")
-      .leftJoinAndSelect("post.author", "author")
-      .where("post.status = :status", { status: BlogPostStatus.PUBLISHED })
-      .orderBy("post.publishedAt", "DESC")
-      .skip((page - 1) * limit)
-      .take(limit);
+    const qb = this.blogRepo.basePublishedQB();
+    const [posts, total] = await new BlogSearchQuery(qb, filter).execute();
 
-    if (category) {
-      qb.andWhere("category.slug = :category", { category });
-    }
-    if (tag) {
-      qb.andWhere("tags.slug = :tag", { tag });
-    }
-    if (search) {
-      qb.andWhere("(post.title ILIKE :s OR post.excerpt ILIKE :s)", {
-        s: `%${search}%`,
-      });
-    }
-    const [posts, total] = await qb.getManyAndCount();
     return {
       posts: posts.map((p) => this.sanitizePost(p)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      ...this.paginate(total, filter.page, filter.limit),
     };
   }
 
-  async getBySlug(
-    slug: string,
-    ipAddress?: string,
-    userId?: string,
-    userAgent?: string
-  ) {
-    const post = await this.postRepository.findOne({
-      where: { slug, status: BlogPostStatus.PUBLISHED },
-      relations: ["category", "tags", "author"],
-    });
+  async getBySlug(slug: string, ipAddress?: string, userId?: string, userAgent?: string) {
+    const post = await this.blogRepo.findPublishedBySlug(slug);
     if (!post) throw new NotFoundError("Post not found");
 
-    await this.trackView(post.id, ipAddress, userId, userAgent);
-    const updated = await this.postRepository.findOne({
-      where: { id: post.id },
-    });
-    post.viewCount = updated?.viewCount ?? post.viewCount;
+    // Separate side effects, no blocking of responses.
+    this.viewTracker.trackAsync(post.id, ipAddress, userId, userAgent);
+
     return this.sanitizePost(post);
   }
 
-  private async trackView(
-    postId: string,
-    ipAddress?: string,
-    userId?: string,
-    userAgent?: string
-  ) {
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-
-    const qb = this.viewRepository
-      .createQueryBuilder("v")
-      .where("v.postId = :postId", { postId })
-      .andWhere("v.viewedAt > :since", { since: thirtyMinsAgo });
-
-    if (userId) {
-      qb.andWhere("v.userId = :userId", { userId });
-    } else if (ipAddress) {
-      qb.andWhere("v.ipAddress = :ip", { ip: ipAddress });
-    } else {
-      return;
-    }
-    const recent = await qb.getOne();
-    if (recent) return;
-
-    await this.viewRepository.save(
-      this.viewRepository.create({ postId, ipAddress, userId, userAgent })
-    );
-
-    await this.postRepository.increment({ id: postId }, "viewCount", 1);
-  }
-
   async getRelated(postId: string, limit = 5) {
-    const post = await this.postRepository.findOne({
-      where: { id: postId },
-      relations: ["tags", "category"],
-    });
+    const post = await this.blogRepo.findById(postId);
     if (!post) return [];
 
     const tagIds = post.tags.map((t) => t.id);
 
-    const qb = this.postRepository
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.category", "category")
-      .leftJoinAndSelect("post.tags", "tags")
-      .where("post.id != :id", { id: postId })
-      .andWhere("post.status = :status", { status: BlogPostStatus.PUBLISHED });
+    const qb = this.blogRepo
+      .basePublishedQB()
+      .andWhere("post.id != :id", { id: postId });
 
-    if (tagIds.length > 0) {
+    if (tagIds.length) {
       qb.andWhere("tags.id IN (:...tagIds)", { tagIds });
     } else {
-      qb.andWhere("category.id = :catId", { catId: post.categoryId });
+      qb.andWhere("category.id = :catId", { catId: (post as any).categoryId });
     }
 
-    const related = await qb
-      .orderBy("post.viewCount", "DESC")
-      .take(limit)
-      .getMany();
-
+    const related = await qb.orderBy("post.viewCount", "DESC").take(limit).getMany();
     return related.map((p) => this.sanitizePost(p));
   }
 
   async getLatest(limit = 5) {
-    const posts = await this.postRepository.find({
-      where: { status: BlogPostStatus.PUBLISHED },
-      relations: ["category", "tags"],
-      order: { publishedAt: "DESC" },
-      take: limit,
-    });
+    const posts = await this.blogRepo
+      .basePublishedQB()
+      .orderBy("post.publishedAt", "DESC")
+      .take(limit)
+      .getMany();
     return posts.map((p) => this.sanitizePost(p));
+  }
+
+  // admin
+  async adminListPosts(filter: {
+    page: number;
+    limit: number;
+    status?: BlogPostStatus;
+    search?: string;
+  }) {
+    // Admin QB: no filter, status=PUBLISHED by default.
+    const qb = this.blogRepo
+      .getRepo()
+      .createQueryBuilder("post")
+      .leftJoinAndSelect("post.category", "category")
+      .leftJoinAndSelect("post.tags", "tags")
+      .orderBy("post.createdAt", "DESC");
+
+    const [posts, total] = await new BlogSearchQuery(qb, filter).execute();
+    return { posts, ...this.paginate(total, filter.page, filter.limit) };
   }
 
   async createPost(data: {
@@ -182,15 +125,15 @@ export class BlogService {
     thumbnail?: string;
     status?: BlogPostStatus;
   }) {
-    const categoty = await this.categoryRepository.findOne({
-      where: { id: data.categoryId },
-    });
-    if (!categoty) throw new NotFoundError("Category not found");
+    const category = await this.categoryRepo.findOne({ where: { id: data.categoryId } });
+    if (!category) throw new NotFoundError("Category not found");
 
-    const slug = await this.uniqueSlug(data.title);
-    const tags = await this.findOrCreateTags(data.tags ?? []);
+    const [slug, tags] = await Promise.all([
+      this.uniqueSlug(data.title),
+      this.blogRepo.upsertTags(data.tags ?? [], this.makeSlug.bind(this)),
+    ]);
 
-    const post = this.postRepository.create({
+    const post = this.blogRepo.create({
       title: data.title,
       slug,
       excerpt: data.excerpt,
@@ -202,10 +145,10 @@ export class BlogService {
       status: data.status ?? BlogPostStatus.DRAFT,
       publishedAt: data.status === BlogPostStatus.PUBLISHED ? new Date() : null,
     });
-    return this.postRepository.save(post);
+
+    return this.blogRepo.save(post);
   }
 
-  // Admin: update post
   async updatePost(
     id: string,
     data: Partial<{
@@ -218,23 +161,20 @@ export class BlogService {
       status: BlogPostStatus;
     }>
   ) {
-    const post = await this.postRepository.findOne({
-      where: { id },
-      relations: ["tags"],
-    });
+    const post = await this.blogRepo.findById(id);
     if (!post) throw new NotFoundError("Post not found");
 
     if (data.title && data.title !== post.title) {
       post.slug = await this.uniqueSlug(data.title, id);
       post.title = data.title;
     }
-    if (data.content !== undefined) post.content = data.content;
-    if (data.excerpt !== undefined) post.excerpt = data.excerpt;
+    if (data.content   !== undefined) post.content   = data.content;
+    if (data.excerpt   !== undefined) post.excerpt   = data.excerpt;
     if (data.thumbnail !== undefined) post.thumbnail = data.thumbnail;
     if (data.categoryId !== undefined) post.categoryId = data.categoryId;
 
     if (data.tags !== undefined) {
-      post.tags = await this.findOrCreateTags(data.tags);
+      post.tags = await this.blogRepo.upsertTags(data.tags, this.makeSlug.bind(this));
     }
 
     if (data.status && data.status !== post.status) {
@@ -244,48 +184,18 @@ export class BlogService {
       }
     }
 
-    return this.postRepository.save(post);
+    return this.blogRepo.save(post);
   }
 
   async deletePost(id: string) {
-    const post = await this.postRepository.findOne({ where: { id } });
+    const post = await this.blogRepo.findById(id);
     if (!post) throw new NotFoundError("Post not found");
-    await this.postRepository.softDelete(id);
-  }
-
-  // Admin: list all posts (include drafts)
-  async adminListPosts(query: {
-    page: number;
-    limit: number;
-    status?: BlogPostStatus;
-    search?: string;
-  }) {
-    const { page, limit, status, search } = query;
-    const qb = this.postRepository
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.category", "category")
-      .leftJoinAndSelect("post.tags", "tags")
-      .orderBy("post.createdAt", "DESC")
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    if (status) qb.andWhere("post.status = :status", { status });
-    if (search) qb.andWhere("post.title ILIKE :s", { s: `%${search}%` });
-
-    const [posts, total] = await qb.getManyAndCount();
-    return { posts, total, page, limit, totalPages: Math.ceil(total / limit) };
-  }
-
-  // Strip sensitive fields
-  private sanitizePost(post: BlogPost) {
-    const { author, ...rest } = post as any;
-    return {
-      ...rest,
-      author: author
-        ? { id: author.id, name: author.name, avatar: author.avatar }
-        : null,
-    };
+    await this.blogRepo.softDelete(id);
   }
 }
 
-export const blogService = new BlogService();
+// Singleton wiring
+import { blogRepository } from "../repositories/blog.repository";
+import { ViewTrackingService } from "./viewTracking.service";
+const viewTracker = new ViewTrackingService(blogRepository);
+export const blogService = new BlogService(blogRepository, viewTracker);
