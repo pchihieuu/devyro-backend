@@ -20,7 +20,18 @@ export const listPosts = asyncHandler(async (req: Request, res: Response) => {
     tag,
     search,
   });
-  res.json({ success: true, data: result });
+  res.json({
+    success: true,
+    data: result.posts,
+    pagination: {
+      currentPage: result.page,
+      totalPages: result.totalPages,
+      totalPosts: result.total,
+      limit: result.limit,
+      hasNextPage: result.page < result.totalPages,
+      hasPrevPage: result.page > 1,
+    },
+  });
 });
 
 export const getPost = asyncHandler(async (req: Request, res: Response) => {
@@ -42,6 +53,13 @@ export const getRelatedPosts = asyncHandler(
   }
 );
 
+export const getPostById = asyncHandler(async (req: Request, res: Response) => {
+  const post = await blogService.getPostById(req.params.id);
+  res.json({
+    success: true,
+    data: post,
+  });
+});
 export const getLatestPosts = asyncHandler(
   async (req: Request, res: Response) => {
     const limit = Math.min(+(req.query.limit as string) || 5, 20);
@@ -67,7 +85,18 @@ export const adminListPosts = asyncHandler(
       status,
       search,
     });
-    res.json({ success: true, data: result });
+    res.json({
+      success: true,
+      data: result.posts,
+      pagination: {
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalPosts: result.total,
+        limit: result.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+      },
+    });
   }
 );
 

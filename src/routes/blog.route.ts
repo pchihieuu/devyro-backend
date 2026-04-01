@@ -17,6 +17,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getPostById,
 } from "../controllers/blog.controller";
 import {
   createPostSchema,
@@ -37,21 +38,7 @@ router.get(ROUTES.BLOGS.BY_SLUG, getPost);
 
 // Admin
 router.get(ROUTES.BLOGS.ADMIN.POSTS, protect, adminOnly, adminListPosts);
-router.post(
-  ROUTES.BLOGS.ADMIN.POSTS,
-  protect,
-  adminOnly,
-  validate(createPostSchema),
-  createPost
-);
-router.put(
-  ROUTES.BLOGS.ADMIN.POST_BY_ID,
-  protect,
-  adminOnly,
-  validate(updatePostSchema),
-  updatePost
-);
-router.delete(ROUTES.BLOGS.ADMIN.POST_BY_ID, protect, adminOnly, deletePost);
+router.get(ROUTES.BLOGS.ADMIN.POST_BY_ID, protect, adminOnly, getPostById);
 
 router.post(
   ROUTES.BLOGS.ADMIN.UPLOAD_IMAGE,
@@ -60,6 +47,22 @@ router.post(
   upload.single("image"),
   uploadBlogImage
 );
+router.post(
+  ROUTES.BLOGS.ADMIN.POSTS,
+  protect,
+  adminOnly,
+  validate(createPostSchema),
+  createPost
+);
+
+router.put(
+  ROUTES.BLOGS.ADMIN.POST_BY_ID,
+  protect,
+  adminOnly,
+  validate(updatePostSchema),
+  updatePost
+);
+router.delete(ROUTES.BLOGS.ADMIN.POST_BY_ID, protect, adminOnly, deletePost);
 
 router.post(
   ROUTES.BLOGS.ADMIN.CATEGORIES,
