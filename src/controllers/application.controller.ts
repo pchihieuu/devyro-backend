@@ -68,7 +68,7 @@ export const getMyApplications = asyncHandler(
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
-        totalApplications: result.total,
+        total: result.total,
         limit: pagination.limit,
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,

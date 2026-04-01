@@ -78,7 +78,7 @@ export const getJobs = asyncHandler(
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
-        totalJobs: result.total,
+        total: result.total,
         limit: pagination.limit,
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
@@ -111,7 +111,14 @@ export const getJobsEmployer = asyncHandler(
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: result.jobs,
-      pagination: result.pagination,
+      pagination: {
+        currentPage: result.pagination.page,
+        totalPages: result.pagination.totalPages,
+        total: result.pagination.total,
+        limit: result.pagination.limit,
+        hasNextPage: result.pagination.page < result.pagination.totalPages,
+        hasPrevPage: result.pagination.page > 1,
+      },
     });
   }
 );

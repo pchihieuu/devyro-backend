@@ -26,7 +26,7 @@ export const listPosts = asyncHandler(async (req: Request, res: Response) => {
     pagination: {
       currentPage: result.page,
       totalPages: result.totalPages,
-      totalPosts: result.total,
+      total: result.total,
       limit: result.limit,
       hasNextPage: result.page < result.totalPages,
       hasPrevPage: result.page > 1,
@@ -53,13 +53,6 @@ export const getRelatedPosts = asyncHandler(
   }
 );
 
-export const getPostById = asyncHandler(async (req: Request, res: Response) => {
-  const post = await blogService.getPostById(req.params.id);
-  res.json({
-    success: true,
-    data: post,
-  });
-});
 export const getLatestPosts = asyncHandler(
   async (req: Request, res: Response) => {
     const limit = Math.min(+(req.query.limit as string) || 5, 20);
@@ -91,7 +84,7 @@ export const adminListPosts = asyncHandler(
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
-        totalPosts: result.total,
+        total: result.total,
         limit: result.limit,
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
@@ -99,6 +92,11 @@ export const adminListPosts = asyncHandler(
     });
   }
 );
+
+export const getPostById = asyncHandler(async (req: Request, res: Response) => {
+  const post = await blogService.getPostById(req.params.id);
+  res.json({ success: true, data: post });
+});
 
 export const createPost = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new BadRequestError("Not authenticated");
