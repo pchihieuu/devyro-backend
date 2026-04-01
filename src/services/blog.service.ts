@@ -1,4 +1,3 @@
-// src/services/blog.service.ts
 import slugify from "slugify";
 import { BlogRepository } from "../repositories/blog.repository";
 import { BlogSearchQuery } from "../queries/BlogSearchQuery";
@@ -41,6 +40,11 @@ export class BlogService {
   }
 
   // public
+  async getPostById(id: string) {
+    const post = await this.blogRepo.findById(id);
+    if (!post) throw new NotFoundError("Post not found");
+    return post;
+  }
   async listPublished(filter: {
     page: number;
     limit: number;
@@ -53,11 +57,19 @@ export class BlogService {
 
     return {
       posts: posts.map((p) => this.sanitizePost(p)),
-      ...this.paginate(total, filter.page, filter.limit),
+      total,
+      page: filter.page,
+      limit: filter.limit,
+      totalPages: Math.ceil(total / filter.limit),
     };
   }
 
-  async getBySlug(slug: string, ipAddress?: string, userId?: string, userAgent?: string) {
+  async getBySlug(
+    slug: string,
+    ipAddress?: string,
+    userId?: string,
+    userAgent?: string
+  ) {
     const post = await this.blogRepo.findPublishedBySlug(slug);
     if (!post) throw new NotFoundError("Post not found");
 
@@ -83,7 +95,10 @@ export class BlogService {
       qb.andWhere("category.id = :catId", { catId: (post as any).categoryId });
     }
 
-    const related = await qb.orderBy("post.viewCount", "DESC").take(limit).getMany();
+    const related = await qb
+      .orderBy("post.viewCount", "DESC")
+      .take(limit)
+      .getMany();
     return related.map((p) => this.sanitizePost(p));
   }
 
@@ -112,7 +127,13 @@ export class BlogService {
       .orderBy("post.createdAt", "DESC");
 
     const [posts, total] = await new BlogSearchQuery(qb, filter).execute();
-    return { posts, ...this.paginate(total, filter.page, filter.limit) };
+    return {
+      posts,
+      total,
+      page: filter.page,
+      limit: filter.limit,
+      totalPages: Math.ceil(total / filter.limit),
+    };
   }
 
   async createPost(data: {
@@ -125,7 +146,9 @@ export class BlogService {
     thumbnail?: string;
     status?: BlogPostStatus;
   }) {
-    const category = await this.categoryRepo.findOne({ where: { id: data.categoryId } });
+    const category = await this.categoryRepo.findOne({
+      where: { id: data.categoryId },
+    });
     if (!category) throw new NotFoundError("Category not found");
 
     const [slug, tags] = await Promise.all([
@@ -168,13 +191,16 @@ export class BlogService {
       post.slug = await this.uniqueSlug(data.title, id);
       post.title = data.title;
     }
-    if (data.content   !== undefined) post.content   = data.content;
-    if (data.excerpt   !== undefined) post.excerpt   = data.excerpt;
+    if (data.content !== undefined) post.content = data.content;
+    if (data.excerpt !== undefined) post.excerpt = data.excerpt;
     if (data.thumbnail !== undefined) post.thumbnail = data.thumbnail;
     if (data.categoryId !== undefined) post.categoryId = data.categoryId;
 
     if (data.tags !== undefined) {
-      post.tags = await this.blogRepo.upsertTags(data.tags, this.makeSlug.bind(this));
+      post.tags = await this.blogRepo.upsertTags(
+        data.tags,
+        this.makeSlug.bind(this)
+      );
     }
 
     if (data.status && data.status !== post.status) {
