@@ -31,20 +31,13 @@ const getIpAddress = (req: Request): string => {
 const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
   const isProduction = config.nodeEnv === "production";
 
-  const cookieOptions = {
+  res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? ("strict" as const) : ("lax" as const),
+    secure: true, // luôn true vì Render dùng HTTPS
+    sameSite: isProduction ? "none" : "lax", // none cho cross-origin production
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
-    ...(isProduction && config.cookieDomain && { domain: config.cookieDomain }),
-  };
-
-  res.cookie("refreshToken", refreshToken, cookieOptions);
-
-  if (!isProduction) {
-    console.log("Refresh token cookie set");
-  }
+  });
 };
 
 /**
@@ -55,14 +48,10 @@ const clearRefreshTokenCookie = (res: Response) => {
 
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? ("strict" as const) : ("lax" as const),
+    secure: true,
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
   });
-
-  if (!isProduction) {
-    console.log("Refresh token cookie cleared");
-  }
 };
 
 export const register = asyncHandler(

@@ -35,7 +35,19 @@ app.use(
 
 app.use(
   cors({
-    origin: config.cors.origin,
+    origin: (origin, callback) => {
+      const allowedOrigins = Array.isArray(config.cors.origin)
+        ? config.cors.origin
+        : [config.cors.origin];
+
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, origin);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
