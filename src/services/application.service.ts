@@ -8,7 +8,7 @@ import {
   ConflictError,
   BadRequestError,
 } from "../utils/errors";
-import { IsNull } from "typeorm";
+import { IsNull, Not } from "typeorm";
 import { notificationService } from "./notification.service";
 import { geminiAIMatchingService } from "./geminiaimatching.service";
 import { cleanResumeText, extractPDFText } from "../utils/pdfextractor.utils";
@@ -298,7 +298,7 @@ export class ApplicationService {
     }
 
     return await this.applicationRepository.find({
-      where: { jobId },
+      where: { jobId, status: Not(ApplicationStatus.WITHDRAWN) },
       relations: ["job", "applicant"],
       select: {
         job: {

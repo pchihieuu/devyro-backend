@@ -65,7 +65,7 @@ export const getAllCompanies = asyncHandler(
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
-        totalCompanies: result.total,
+        total: result.total,
         limit: pagination.limit,
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
@@ -127,7 +127,7 @@ export const getCompanyJobs = asyncHandler(
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
-        totalJobs: result.total,
+        total: result.total,
         limit: pagination.limit,
         hasNextPage: result.page < result.totalPages,
         hasPrevPage: result.page > 1,
