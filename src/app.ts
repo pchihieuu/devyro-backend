@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import express, { Application } from "express";
+import express, { Express } from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.route";
 import userRoutes from "./routes/user.route";
@@ -16,8 +16,11 @@ import { API_PREFIX, ROUTES } from "./constants/routes";
 import helmet from "helmet";
 import { config } from "./config/env.config";
 import cookieParser from "cookie-parser";
+import { setupMetrics } from "./middlewares/metrics.middleware";
 
-const app: Application = express();
+const app: Express = express();
+
+setupMetrics(app);
 
 app.use(
   helmet({
@@ -57,9 +60,7 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
 app.use(cookieParser());
-
 app.set("trust proxy", 1);
 
 app.get(`${API_PREFIX}${ROUTES.HEALTH.CHECK}`, (req, res) => {
@@ -80,8 +81,8 @@ app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
 app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
 app.use(`${API_PREFIX}${ROUTES.CHAT.BASE}`, chatRoutes);
 app.use(`${API_PREFIX}${ROUTES.BLOGS.BASE}`, blogRoutes);
-app.use(notFoundHandler);
 
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
