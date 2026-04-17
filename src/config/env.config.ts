@@ -24,7 +24,7 @@ interface CloudinaryConfig {
 }
 
 interface GeminiApi {
-  apiKey: string; 
+  apiKey: string;
 }
 
 interface EmailConfig {
@@ -130,7 +130,7 @@ export const config: AppConfig = {
     origin:
       process.env.CORS_ORIGIN ||
       process.env.CLIENT_URL ||
-      "https://job-portal-vn.vercel.app/",
+      "https://https://devyro.vercel.app/",
     credentials: true,
   },
   rateLimit: {
