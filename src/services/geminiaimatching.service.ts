@@ -12,10 +12,10 @@ interface ResumeData {
  * Configuration constants
  */
 const GEMINI_CONFIG = {
-  TIMEOUT_MS: 60000, 
-  MAX_RETRIES: 2, 
-  RETRY_DELAY_MS: 1000, 
-  MAX_RESUME_LENGTH: 10000, 
+  TIMEOUT_MS: 60000,
+  MAX_RETRIES: 2,
+  RETRY_DELAY_MS: 1000,
+  MAX_RESUME_LENGTH: 10000,
   MAX_JOB_DESC_LENGTH: 3000,
 } as const;
 
@@ -42,6 +42,7 @@ class GeminiAPIError extends Error {
 export class GeminiAIMatchingService {
   private genAI: GoogleGenerativeAI;
   private model: any;
+  private models: { name: string; instance: any }[] = [];
 
   constructor() {
     const apiKey = config.gemini.apiKey;
@@ -50,19 +51,27 @@ export class GeminiAIMatchingService {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
 
-    
-    this.model = this.genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.1, 
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192, 
-        responseMimeType: "application/json",
-      },
-    });
-
-    
+    const modelNames = [
+      "gemini-3-flash-preview",
+      "gemini-3.1-flash-lite-preview",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+    ];
+    this.models = modelNames.map((name) => ({
+      name,
+      instance: this.genAI.getGenerativeModel({
+        model: name,
+        generationConfig: {
+          temperature: 0.1,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+        },
+      }),
+    }));
+    this.model = this.models[0].instance;
   }
 
   /**
@@ -72,43 +81,46 @@ export class GeminiAIMatchingService {
     resume: ResumeData,
     job: Job
   ): Promise<AIMatchingAnalysis> {
-    console.log("\n=== GEMINI AI ANALYSIS START ===");
-    console.log("Timestamp:", new Date().toISOString());
-    console.log(`Job: ${job.title}`);
-    console.log(
-      `Resume text length: ${resume.text?.length || 0} characters`
-    );
-
     let lastError: Error | null = null;
 
-    for (let attempt = 1; attempt <= GEMINI_CONFIG.MAX_RETRIES; attempt++) {
+    for (const { name, instance } of this.models) {
       try {
-        if (attempt > 1) {
-          console.log(
-            `Retry attempt ${attempt}/${GEMINI_CONFIG.MAX_RETRIES}`
-          );
-          await this.delay(GEMINI_CONFIG.RETRY_DELAY_MS);
-        }
-
+        console.log(`Trying model: ${name}`);
+        this.model = instance; // switch active model
         return await this.performAnalysis(resume, job);
       } catch (error: any) {
         lastError = error;
 
-        // Retry only on timeout errors
-        if (
-          error instanceof GeminiTimeoutError &&
-          attempt < GEMINI_CONFIG.MAX_RETRIES
-        ) {
-          console.warn(`Timeout on attempt ${attempt}, retrying...`);
+        // Reserve only when quota is exhausted (429)
+        if (error instanceof GeminiAPIError && error.statusCode === 429) {
+          console.warn(`Model ${name} quota exceeded, trying next model...`);
           continue;
+        }
+
+        // Timeout → Retry that same model once.
+        if (error instanceof GeminiTimeoutError) {
+          console.warn(`Model ${name} timeout, retrying once...`);
+          try {
+            await this.delay(GEMINI_CONFIG.RETRY_DELAY_MS);
+            return await this.performAnalysis(resume, job);
+          } catch (retryError: any) {
+            lastError = retryError;
+            // If the timeout occurs a second time, it will fall back to a lighter model.
+            if (
+              retryError instanceof GeminiAPIError &&
+              retryError.statusCode === 429
+            ) {
+              continue;
+            }
+            break;
+          }
         }
 
         break;
       }
     }
 
-    // All retries failed
-    throw lastError || new Error("Analysis failed");
+    throw lastError || new Error("All models exhausted");
   }
 
   /**
@@ -153,6 +165,9 @@ export class GeminiAIMatchingService {
       console.log(`Prompt built: ${prompt.length} chars`);
 
       console.log("Calling Gemini API...");
+      const activeModelName =
+        this.models.find((m) => m.instance === this.model)?.name || "unknown";
+      console.log(`Active model: ${activeModelName}`);
       const startTime = Date.now();
 
       // Call Gemini API with improved timeout handling
@@ -462,9 +477,7 @@ Return the complete JSON now:`;
    */
   private async extractResumeText(resume: ResumeData): Promise<string> {
     if (resume.text && resume.text.length > 50) {
-      console.log(
-        `Using provided resume text (${resume.text.length} chars)`
-      );
+      console.log(`Using provided resume text (${resume.text.length} chars)`);
       return resume.text;
     }
 

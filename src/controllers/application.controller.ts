@@ -163,15 +163,28 @@ export const triggerAIAnalysis = asyncHandler(
       throw new ForbiddenError("Only employers can trigger AI analysis");
     }
 
-    const result = await applicationService.triggerAIAnalysis(
-      req.params.id,
-      req.user!.id
-    );
+    try {
+      const result = await applicationService.triggerAIAnalysis(
+        req.params.id,
+        req.user!.id
+      );
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: result.message,
-      data: result.analysis,
-    });
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: result.message,
+        data: result.analysis,
+      });
+    } catch (error: any) {
+      // Distinguish quota errors from other errors
+      if (error.statusCode === 429 || error.message?.includes("quota")) {
+        res.status(429).json({
+          success: false,
+          message: "AI service quota exceeded. Please try again later.",
+          retryAfter: 30,
+        });
+        return;
+      }
+      throw error; // Let asyncHandler handle other errors.
+    }
   }
 );

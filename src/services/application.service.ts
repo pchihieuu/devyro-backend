@@ -112,11 +112,11 @@ export class ApplicationService {
   private async performAIAnalysis(
     applicationId: string,
     resumeUrl: string,
-    job: Job
+    job: Job,
+    throwOnError = false
   ): Promise<void> {
     try {
       let resumeText: string;
-
       try {
         resumeText = await extractPDFText(resumeUrl);
         resumeText = cleanResumeText(resumeText);
@@ -130,7 +130,6 @@ export class ApplicationService {
         job
       );
 
-      // Update application with analysis results
       await this.applicationRepository.update(applicationId, {
         aiMatchingScore: analysis.score,
         aiMatchingAnalysis: analysis,
@@ -142,6 +141,12 @@ export class ApplicationService {
       );
     } catch (error) {
       console.error("Gemini AI analysis error:", error);
+
+      if (throwOnError) {
+        throw error; // triggerAIAnalysis will be captured
+      }
+
+      // Silent fallback only occurs when calling async from applyToJob.
       await this.applicationRepository.update(applicationId, {
         aiMatchingScore: 0,
         aiMatchingAnalysis: {
@@ -149,19 +154,9 @@ export class ApplicationService {
           strengths: [],
           weaknesses: [],
           recommendations: ["AI analysis failed - manual review required"],
-          skillsMatch: {
-            matched: [],
-            missing: [],
-            matchPercentage: 0,
-          },
-          experienceMatch: {
-            summary: "Analysis unavailable",
-            isMatch: false,
-          },
-          educationMatch: {
-            summary: "Analysis unavailable",
-            isMatch: false,
-          },
+          skillsMatch: { matched: [], missing: [], matchPercentage: 0 },
+          experienceMatch: { summary: "Analysis unavailable", isMatch: false },
+          educationMatch: { summary: "Analysis unavailable", isMatch: false },
           overallAssessment:
             "AI analysis encountered an error. Please review manually.",
         },
@@ -198,7 +193,8 @@ export class ApplicationService {
     await this.performAIAnalysis(
       application.id,
       application.resume,
-      application.job
+      application.job,
+      true
     );
 
     // Fetch updated application
