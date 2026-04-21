@@ -72,14 +72,14 @@ export class Application {
     nullable: true,
     comment: "Detailed AI analysis",
   })
-  aiMatchingAnalysis: AIMatchingAnalysis;
+  aiMatchingAnalysis: AIMatchingAnalysis | null;
 
   @Column({
     type: "timestamp",
     nullable: true,
     comment: "Timestamp when AI analysis was performed",
   })
-  aiAnalyzedAt: Date;
+  aiAnalyzedAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;
