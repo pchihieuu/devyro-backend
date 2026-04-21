@@ -27,7 +27,8 @@ export class ApplicationService {
   private companyRepository = AppDataSource.getRepository(Company);
 
   /**
-   * Apply to a job with AI matching analysis
+   * Apply to a job with AI matching analysis.
+   * Supports re-applying after withdrawal (upsert existing WITHDRAWN record).
    */
   async applyToJob(
     jobId: string,
@@ -50,30 +51,39 @@ export class ApplicationService {
       throw new BadRequestError("This job is no longer accepting applications");
     }
 
-    const existing = await this.applicationRepository.findOne({
-      where: {
-        jobId,
-        applicantId,
-      },
-    });
-
-    if (existing) {
-      throw new ConflictError("You have already applied to this job");
-    }
-
     if (!resumeUrl) {
       throw new BadRequestError("Resume is required to apply for this job");
     }
 
-    // Create application
-    const application = this.applicationRepository.create({
-      jobId,
-      applicantId,
-      resume: resumeUrl,
-      status: ApplicationStatus.APPLIED,
+    const existing = await this.applicationRepository.findOne({
+      where: { jobId, applicantId },
     });
 
-    const savedApplication = await this.applicationRepository.save(application);
+    let savedApplication: Application;
+
+    if (existing) {
+      if (existing.status !== ApplicationStatus.WITHDRAWN) {
+        throw new ConflictError("You have already applied to this job");
+      }
+
+      existing.status = ApplicationStatus.APPLIED;
+      existing.resume = resumeUrl;
+      existing.aiMatchingScore = 0;
+      existing.aiMatchingAnalysis = null;
+      existing.aiAnalyzedAt = null;
+
+      savedApplication = await this.applicationRepository.save(existing);
+    } else {
+      // Fresh application
+      const application = this.applicationRepository.create({
+        jobId,
+        applicantId,
+        resume: resumeUrl,
+        status: ApplicationStatus.APPLIED,
+      });
+
+      savedApplication = await this.applicationRepository.save(application);
+    }
 
     // Perform AI matching analysis asynchronously (don't block the response)
     this.performAIAnalysis(savedApplication.id, resumeUrl, job).catch(
@@ -86,7 +96,7 @@ export class ApplicationService {
       }
     );
 
-    // Load applicant details
+    // Load applicant details for notification
     const fullApplication = await this.applicationRepository.findOne({
       where: { id: savedApplication.id },
       relations: ["applicant"],
@@ -143,10 +153,10 @@ export class ApplicationService {
       console.error("Gemini AI analysis error:", error);
 
       if (throwOnError) {
-        throw error; // triggerAIAnalysis will be captured
+        throw error;
       }
 
-      // Silent fallback only occurs when calling async from applyToJob.
+      // Silent fallback — only reached when called async from applyToJob
       await this.applicationRepository.update(applicationId, {
         aiMatchingScore: 0,
         aiMatchingAnalysis: {
@@ -166,7 +176,7 @@ export class ApplicationService {
   }
 
   /**
-   * Manually trigger AI analysis for existing application
+   * Manually trigger AI analysis for an existing application (Employer only)
    */
   async triggerAIAnalysis(
     applicationId: string,
@@ -189,7 +199,6 @@ export class ApplicationService {
       throw new BadRequestError("No resume found for this application");
     }
 
-    // Perform analysis
     await this.performAIAnalysis(
       application.id,
       application.resume,
@@ -197,7 +206,6 @@ export class ApplicationService {
       true
     );
 
-    // Fetch updated application
     const updated = await this.applicationRepository.findOne({
       where: { id: applicationId },
       select: ["aiMatchingScore", "aiMatchingAnalysis", "aiAnalyzedAt"],
@@ -216,7 +224,8 @@ export class ApplicationService {
   }
 
   /**
-   * Get applicant's applications
+   * Get applicant's own applications.
+   * Excludes WITHDRAWN by default; pass status=Withdrawn to see them explicitly.
    */
   async getMyApplications(
     applicantId: string,
@@ -230,7 +239,8 @@ export class ApplicationService {
     const { page, limit, sortBy, order, status } = pagination;
     const skip = (page - 1) * limit;
 
-    const where: any = { applicantId };
+    let where: any = { applicantId };
+
     if (status) {
       const enumValue = Object.values(ApplicationStatus).find(
         (v) => v === status
@@ -238,10 +248,13 @@ export class ApplicationService {
       if (enumValue) {
         where.status = enumValue;
       }
+    } else {
+      // Hide withdrawn applications from the default list view
+      where.status = Not(ApplicationStatus.WITHDRAWN);
     }
 
-    const [applications, total] = await this.applicationRepository.findAndCount(
-      {
+    const [applications, total] =
+      await this.applicationRepository.findAndCount({
         where,
         relations: ["job", "job.company"],
         select: {
@@ -257,8 +270,7 @@ export class ApplicationService {
         order: { [sortBy]: order },
         skip,
         take: limit,
-      }
-    );
+      });
 
     return {
       applications,
@@ -269,7 +281,8 @@ export class ApplicationService {
   }
 
   /**
-   * Get applicants for a specific job (Employer only) - with AI scores
+   * Get all applicants for a specific job (Employer only), sorted by AI score.
+   * Excludes withdrawn applications.
    */
   async getApplicantsForJob(
     jobId: string,
@@ -321,7 +334,8 @@ export class ApplicationService {
   }
 
   /**
-   * Get application by ID - with AI analysis
+   * Get a single application by ID.
+   * Accessible by the applicant themselves or the employer who posted the job.
    */
   async getApplicationById(
     applicationId: string,
@@ -366,7 +380,8 @@ export class ApplicationService {
   }
 
   /**
-   * Update application status (Employer only)
+   * Update application status (Employer only).
+   * Cannot update ACCEPTED, REJECTED, or WITHDRAWN applications.
    */
   async updateApplicationStatus(
     applicationId: string,
@@ -386,7 +401,6 @@ export class ApplicationService {
       throw new ForbiddenError("Not authorized to update this application");
     }
 
-    // Employer cannot change a withdrawn application
     const lockedStatuses = [
       ApplicationStatus.ACCEPTED,
       ApplicationStatus.REJECTED,
@@ -417,6 +431,10 @@ export class ApplicationService {
     return { message: "Application status updated successfully", status };
   }
 
+  /**
+   * Withdraw an application (Job seeker only).
+   * Only APPLIED or IN_REVIEW applications can be withdrawn.
+   */
   async withdrawApplication(
     applicationId: string,
     applicantId: string
