@@ -101,4 +101,16 @@ export const ROUTES = {
       CATEGORY_BY_ID: "/admin/categories/:id",
     },
   },
+  VIDEO_CALL: {
+    BASE: "/calls",
+    HISTORY: "/history",
+    ACTIVE: "/active",
+    BY_ID: "/:callId",
+    ACCEPT: "/:callId/accept",
+    DECLINE: "/:callId/decline",
+    LEAVE: "/:callId/leave",
+    END: "/:callId/end",
+    CANCEL: "/:callId/cancel",
+    INVITE: "/:callId/invite",
+  },
 };

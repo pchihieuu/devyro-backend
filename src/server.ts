@@ -10,6 +10,12 @@ import {
 import { initializeWebSocket } from "./services/websocket.service";
 import { createServer } from "http";
 import { setupScheduledJobs } from "./jobs/scheduledJobs";
+import {
+  startCallCleanupJob,
+  stopCallCleanupJob,
+} from "./services/videocall.cleanup";
+import { closeRabbitMQ, connectRabbitMQ } from "./config/rabbitmq.config";
+import { setupConsumers } from "./messaging/consumers";
 
 const PORT = process.env.PORT || 5000;
 
@@ -18,10 +24,12 @@ const httpServer = createServer(app);
 const startServer = async () => {
   try {
     await initializeDatabase();
-    setupScheduledJobs();
-
+    await connectRabbitMQ();
     initializeWebSocket(httpServer);
     console.log("WebSocket initialized successfully");
+    await setupConsumers();
+    startCallCleanupJob();
+    setupScheduledJobs();
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
@@ -35,7 +43,10 @@ const startServer = async () => {
         console.log("HTTP server closed.");
 
         try {
+          stopCallCleanupJob();
+          await closeRabbitMQ();
           await closeDatabase();
+
           console.log("Shutdown complete. Exiting now.");
           process.exit(0);
         } catch (error) {
