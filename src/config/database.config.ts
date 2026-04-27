@@ -15,8 +15,6 @@ import { BlogCategory } from "../entities/BlogCategory.entity";
 import { BlogPost } from "../entities/BlogPost.entity";
 import { BlogPostView } from "../entities/BlogPostView.entity";
 import { BlogTag } from "../entities/BlogTag.entity";
-import { VideoCall } from "../entities/Videocall.entity";
-import { CallParticipant } from "../entities/CallParticipant.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -61,8 +59,6 @@ const developmentConfig: DataSourceOptions = {
     BlogPost,
     BlogPostView,
     BlogTag,
-    VideoCall,
-    CallParticipant,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
