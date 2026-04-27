@@ -18,10 +18,11 @@ const httpServer = createServer(app);
 const startServer = async () => {
   try {
     await initializeDatabase();
-    setupScheduledJobs();
 
     initializeWebSocket(httpServer);
     console.log("WebSocket initialized successfully");
+
+    setupScheduledJobs();
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
@@ -36,6 +37,7 @@ const startServer = async () => {
 
         try {
           await closeDatabase();
+
           console.log("Shutdown complete. Exiting now.");
           process.exit(0);
         } catch (error) {

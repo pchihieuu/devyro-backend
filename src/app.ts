@@ -81,7 +81,6 @@ app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
 app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
 app.use(`${API_PREFIX}${ROUTES.CHAT.BASE}`, chatRoutes);
 app.use(`${API_PREFIX}${ROUTES.BLOGS.BASE}`, blogRoutes);
-
 app.use(notFoundHandler);
 app.use(errorHandler);
 

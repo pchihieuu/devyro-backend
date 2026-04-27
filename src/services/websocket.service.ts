@@ -7,7 +7,6 @@ import { User } from "../entities/User.entity";
 interface AuthenticatedSocket extends Socket {
   userId?: string;
 }
-
 export class WebSocketService {
   private io: SocketIOServer;
   private userSockets: Map<string, string> = new Map();
@@ -62,12 +61,12 @@ export class WebSocketService {
       if (socket.userId) {
         this.userSockets.set(socket.userId, socket.id);
         socket.join(`user:${socket.userId}`);
-        
-        // Broadcast online status
+
+        // Same-instance broadcast — no MQ needed (fire and forget)
         this.io.emit("user:online", { userId: socket.userId });
       }
 
-      // Handle typing indicator
+      // Typing indicators — real-time, same-instance relay, NOT queued
       socket.on("typing:start", (data: { receiverId: string }) => {
         if (socket.userId) {
           this.io.to(`user:${data.receiverId}`).emit("typing:start", {
@@ -91,6 +90,8 @@ export class WebSocketService {
           this.io.emit("user:offline", { userId: socket.userId });
         }
       });
+
+      
     });
   }
 
@@ -101,7 +102,7 @@ export class WebSocketService {
       title: string;
       message: string;
       type: string;
-      metadata?: any;
+      metadata?: unknown;
       createdAt: Date;
     }
   ) {
@@ -124,16 +125,11 @@ export class WebSocketService {
     this.io.to(`user:${userId}`).emit("message:new", message);
   }
 
-  /**
-   * Send a generic event to a specific user
-   */
-  public sendToUser(userId: string, event: string, data: any) {
+  /** Emit any event to a user connected on THIS instance. */
+  public sendToUser(userId: string, event: string, data: unknown) {
     this.io.to(`user:${userId}`).emit(event, data);
   }
 
-  /**
-   * Notify user that a conversation has been deleted
-   */
   public notifyConversationDeleted(
     userId: string,
     data: { otherUserId: string; conversationId: string }
