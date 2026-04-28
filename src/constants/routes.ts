@@ -101,4 +101,27 @@ export const ROUTES = {
       CATEGORY_BY_ID: "/admin/categories/:id",
     },
   },
+  GROUPS: {
+    BASE: "/groups",
+
+    PENDING_INVITATIONS: "/invitations/pending",
+
+    BY_ID: "/:groupId",
+    UPDATE: "/:groupId",
+    LEAVE: "/:groupId/leave",
+
+    ACCEPT_INVITATION: "/:groupId/invitations/accept",
+    REJECT_INVITATION: "/:groupId/invitations/reject",
+
+    MESSAGES: "/:groupId/messages",
+    DELETE_MESSAGE: "/:groupId/messages/:messageId",
+
+    UPLOAD_MEDIA: "/:groupId/media",
+
+    MARK_AS_READ: "/:groupId/read",
+
+    MEMBERS: "/:groupId/members",
+    REMOVE_MEMBER: "/:groupId/members/:targetUserId",
+    PROMOTE_MEMBER: "/:groupId/members/:targetUserId/promote",
+  },
 };

@@ -3,6 +3,7 @@ import { Server as HTTPServer } from "http";
 import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/database.config";
 import { User } from "../entities/User.entity";
+import { groupChatService } from "./group-chat.service";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -64,6 +65,12 @@ export class WebSocketService {
 
         // Same-instance broadcast — no MQ needed (fire and forget)
         this.io.emit("user:online", { userId: socket.userId });
+
+        // Reconnect sync
+        // Push latest group state + pending invitations on every connect
+        groupChatService.syncOnReconnect(socket.userId).catch((err) => {
+          console.error("Error syncing group chat state on reconnect:", err);
+        });
       }
 
       // Typing indicators — real-time, same-instance relay, NOT queued
@@ -83,6 +90,38 @@ export class WebSocketService {
         }
       });
 
+      // Group typing indicators
+      socket.on("group:typing:start", (data: { groupId: string }) => {
+        if (socket.userId) {
+          socket.to(`group:${data.groupId}`).emit("group:typing:start", {
+            groupId: data.groupId,
+            userId: socket.userId,
+          });
+        }
+      });
+
+      socket.on("group:typing:stop", (data: { groupId: string }) => {
+        if (socket.userId) {
+          socket.to(`group:${data.groupId}`).emit("group:typing:stop", {
+            groupId: data.groupId,
+            userId: socket.userId,
+          });
+        }
+      });
+
+      // Join group socket room (called after accepting invitation)
+      socket.on("group:join:room", (data: { groupId: string }) => {
+        if (socket.userId) {
+          socket.join(`group:${data.groupId}`);
+        }
+      });
+
+      socket.on("group:leave:room", (data: { groupId: string }) => {
+        if (socket.userId) {
+          socket.leave(`group:${data.groupId}`);
+        }
+      });
+
       socket.on("disconnect", () => {
         console.log(`User disconnected: ${socket.userId}`);
         if (socket.userId) {
@@ -90,23 +129,17 @@ export class WebSocketService {
           this.io.emit("user:offline", { userId: socket.userId });
         }
       });
-
-      
     });
   }
 
-  public sendNotificationToUser(
-    userId: string,
-    notification: {
-      id: string;
-      title: string;
-      message: string;
-      type: string;
-      metadata?: unknown;
-      createdAt: Date;
-    }
-  ) {
-    this.io.to(`user:${userId}`).emit("notification", notification);
+  /** Send to specific user room */
+  public sendToUser(userId: string, event: string, data: unknown) {
+    this.io.to(`user:${userId}`).emit(event, data);
+  }
+
+  /** Send to all members of a group room */
+  public sendToGroup(groupId: string, event: string, data: unknown) {
+    this.io.to(`group:${groupId}`).emit(event, data);
   }
 
   public sendMessageToUser(
@@ -125,9 +158,18 @@ export class WebSocketService {
     this.io.to(`user:${userId}`).emit("message:new", message);
   }
 
-  /** Emit any event to a user connected on THIS instance. */
-  public sendToUser(userId: string, event: string, data: unknown) {
-    this.io.to(`user:${userId}`).emit(event, data);
+  public sendNotificationToUser(
+    userId: string,
+    notification: {
+      id: string;
+      title: string;
+      message: string;
+      type: string;
+      metadata?: unknown;
+      createdAt: Date;
+    }
+  ) {
+    this.io.to(`user:${userId}`).emit("notification", notification);
   }
 
   public notifyConversationDeleted(

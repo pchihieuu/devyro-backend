@@ -17,6 +17,7 @@ import helmet from "helmet";
 import { config } from "./config/env.config";
 import cookieParser from "cookie-parser";
 import { setupMetrics } from "./middlewares/metrics.middleware";
+import groupChatRoutes from "./routes/group-chat.routes";
 
 const app: Express = express();
 
@@ -81,6 +82,8 @@ app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
 app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
 app.use(`${API_PREFIX}${ROUTES.CHAT.BASE}`, chatRoutes);
 app.use(`${API_PREFIX}${ROUTES.BLOGS.BASE}`, blogRoutes);
+app.use(`${API_PREFIX}${ROUTES.GROUPS.BASE}`, groupChatRoutes);
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
