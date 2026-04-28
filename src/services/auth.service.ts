@@ -33,7 +33,7 @@ interface LoginData {
 }
 
 interface AuthResponse {
-  _id: string;
+  id: string;
   name: string;
   email: string;
   avatar: string;
@@ -392,7 +392,7 @@ export class AuthService {
     );
 
     return {
-      _id: user.id,
+      id: user.id,
       name: user.name,
       email: user.email,
       avatar: user.avatar || "",
