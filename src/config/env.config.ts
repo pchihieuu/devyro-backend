@@ -58,12 +58,17 @@ interface UploadConfig {
   allowedResumeTypes: string[];
 }
 
+interface RMQConfig {
+  url: string;
+}
+
 interface AppConfig {
   database: DatabaseConfig;
   jwt: JwtConfig;
   cloudinary: CloudinaryConfig;
   email: EmailConfig;
   cors: CorsConfig;
+  rmq: RMQConfig;
   rateLimit: RateLimitConfig;
   api: ApiConfig;
   upload: UploadConfig;
@@ -156,4 +161,7 @@ export const config: AppConfig = {
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
   cookieDomain: process.env.COOKIE_DOMAIN,
+  rmq: {
+    url: process.env.RABBITMQ_URL as string,
+  },
 };

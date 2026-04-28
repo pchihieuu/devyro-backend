@@ -15,6 +15,10 @@ import { BlogCategory } from "../entities/BlogCategory.entity";
 import { BlogPost } from "../entities/BlogPost.entity";
 import { BlogPostView } from "../entities/BlogPostView.entity";
 import { BlogTag } from "../entities/BlogTag.entity";
+import { Group } from "../entities/Group.entity";
+import { GroupMember } from "../entities/GroupMember.entity";
+import { GroupMessage } from "../entities/GroupMessage.entity";
+import { GroupMessageSeen } from "../entities/GroupMessageSeen.entity";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -59,6 +63,10 @@ const developmentConfig: DataSourceOptions = {
     BlogPost,
     BlogPostView,
     BlogTag,
+    Group,
+    GroupMember,
+    GroupMessage,
+    GroupMessageSeen,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
