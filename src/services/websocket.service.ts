@@ -11,6 +11,7 @@ interface AuthenticatedSocket extends Socket {
 export class WebSocketService {
   private io: SocketIOServer;
   private userSockets: Map<string, string> = new Map();
+  private syncDebounce: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(server: HTTPServer) {
     this.io = new SocketIOServer(server, {
@@ -59,18 +60,24 @@ export class WebSocketService {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
       console.log(`User connected: ${socket.userId}`);
 
+      
       if (socket.userId) {
         this.userSockets.set(socket.userId, socket.id);
         socket.join(`user:${socket.userId}`);
-
-        // Same-instance broadcast — no MQ needed (fire and forget)
         this.io.emit("user:online", { userId: socket.userId });
 
-        // Reconnect sync
-        // Push latest group state + pending invitations on every connect
-        groupChatService.syncOnReconnect(socket.userId).catch((err) => {
-          console.error("Error syncing group chat state on reconnect:", err);
-        });
+        // ✅ Debounce sync — tránh hammer DB khi reconnect liên tục
+        const existing = this.syncDebounce.get(socket.userId);
+        if (existing) clearTimeout(existing);
+
+        const timeout = setTimeout(() => {
+          this.syncDebounce.delete(socket.userId!);
+          groupChatService.syncOnReconnect(socket.userId!).catch((err) => {
+            console.error("Error syncing group chat state on reconnect:", err);
+          });
+        }, 500); // debounce 500ms
+
+        this.syncDebounce.set(socket.userId, timeout);
       }
 
       // Typing indicators — real-time, same-instance relay, NOT queued
@@ -156,6 +163,15 @@ export class WebSocketService {
     }
   ) {
     this.io.to(`user:${userId}`).emit("message:new", message);
+  }
+
+  public sendToGroupExclude(
+    groupId: string,
+    excludeSocketId: string,
+    event: string,
+    data: unknown
+  ) {
+    this.io.to(`group:${groupId}`).except(excludeSocketId).emit(event, data);
   }
 
   public sendNotificationToUser(

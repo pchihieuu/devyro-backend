@@ -28,10 +28,16 @@ export interface GroupNotificationPayload {
   data: unknown;
 }
 
-export async function publishGroupMessage(payload: GroupMessagePayload): Promise<void> {
-  await mqService.publish(ExchangeName.GROUP_EVENTS, "group.message.new", payload);
+export function publishGroupMessage(payload: GroupMessagePayload): void {
+  mqService.publish(ExchangeName.GROUP_EVENTS, "group.message.new", payload);
 }
 
-export async function publishGroupNotification(payload: GroupNotificationPayload): Promise<void> {
-  await mqService.publish(ExchangeName.GROUP_EVENTS, "group.notification.send", payload);
+export async function publishGroupNotification(
+  payload: GroupNotificationPayload
+): Promise<void> {
+  await mqService.publish(
+    ExchangeName.GROUP_EVENTS,
+    "group.notification.send",
+    payload
+  );
 }

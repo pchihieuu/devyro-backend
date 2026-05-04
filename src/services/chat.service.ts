@@ -17,26 +17,25 @@ export class ChatService {
   private conversationRepository = AppDataSource.getRepository(Conversation);
   private userRepository = AppDataSource.getRepository(User);
 
-  /**
-   * Send a message
-   */
   async sendMessage(senderId: string, data: SendMessageData): Promise<Message> {
     const { receiverId, content, type = MessageType.TEXT, fileUrl } = data;
 
-    // Validate receiver exists
-    const receiver = await this.userRepository.findOne({
-      where: { id: receiverId },
-    });
+    // Validate + save song song
+    const [receiver, sender] = await Promise.all([
+      this.userRepository.findOne({
+        where: { id: receiverId },
+        select: ["id", "name", "avatar"],
+      }),
+      this.userRepository.findOne({
+        where: { id: senderId },
+        select: ["id", "name", "avatar"],
+      }),
+    ]);
 
-    if (!receiver) {
-      throw new NotFoundError("Receiver not found");
-    }
-
-    if (senderId === receiverId) {
+    if (!receiver) throw new NotFoundError("Receiver not found");
+    if (senderId === receiverId)
       throw new BadRequestError("Cannot send message to yourself");
-    }
 
-    // Create message
     const message = this.messageRepository.create({
       senderId,
       receiverId,
@@ -44,36 +43,32 @@ export class ChatService {
       type,
       fileUrl,
     });
-
     await this.messageRepository.save(message);
 
-    // Load sender info
-    const messageWithSender = await this.messageRepository.findOne({
-      where: { id: message.id },
-      relations: ["sender", "receiver"],
-    });
-
-    // Update or create conversation
-    await this.updateConversation(senderId, receiverId, content);
-
-    // Send real-time notification via WebSocket
+    // ✅ WS NGAY — không chờ side effects
     try {
       const wsService = getWebSocketService();
       wsService.sendMessageToUser(receiverId, {
         id: message.id,
         senderId,
-        senderName: messageWithSender!.sender.name,
-        senderAvatar: messageWithSender!.sender.avatar,
+        senderName: sender!.name,
+        senderAvatar: sender!.avatar,
         content,
         type,
         fileUrl,
         createdAt: message.createdAt,
       });
     } catch (error) {
-      console.error("Failed to send WebSocket message:", error);
+      console.error("WS send failed:", error);
     }
 
-    return messageWithSender!;
+    // ✅ Side effects fire-and-forget — không block response
+    this.updateConversation(senderId, receiverId, content).catch((err) =>
+      console.error("updateConversation error:", err)
+    );
+
+    // Return ngay — không findOne lại
+    return Object.assign(message, { sender, receiver }) as Message;
   }
 
   /**

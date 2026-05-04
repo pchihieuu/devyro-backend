@@ -107,9 +107,9 @@ export class GroupChatService {
       );
       await this.memberRepo.save(pendingMembers);
 
-      // Send invitations via MQ → WS
+      // ✅ Fire-and-forget — invitation không cần block response trả về group
       const creator = userMap.get(creatorId)!;
-      await publishGroupNotification({
+      publishGroupNotification({
         event: "group:invitation",
         targetUserIds: inviteeIds,
         data: {
@@ -122,7 +122,9 @@ export class GroupChatService {
           },
           actions: { accept: true, reject: true },
         },
-      });
+      }).catch((err) =>
+        console.error("[createGroup] publishGroupNotification error:", err)
+      );
     }
 
     return (await this.groupRepo.findOne({
@@ -130,6 +132,8 @@ export class GroupChatService {
       relations: ["members", "members.user", "createdBy"],
     }))!;
   }
+
+  // Update Group
 
   /**
    * Cập nhật thông tin group (tên, mô tả, avatar).
@@ -164,7 +168,8 @@ export class GroupChatService {
       where: { groupId, status: MemberStatus.ACTIVE },
     });
 
-    await publishGroupNotification({
+    // ✅ Fire-and-forget — UI update notification không cần block
+    publishGroupNotification({
       event: "group:updated",
       targetUserIds: activeMembers.map((m) => m.userId),
       data: {
@@ -174,14 +179,17 @@ export class GroupChatService {
         avatar: group.avatar,
         updatedBy: requesterId,
       },
-    });
+    }).catch((err) =>
+      console.error("[updateGroup] publishGroupNotification error:", err)
+    );
 
     return (await this.groupRepo.findOne({
       where: { id: groupId },
       relations: ["members", "members.user", "createdBy"],
     }))!;
   }
-  // Invitation Response
+
+  //  Invitation Response
   /**
    * User accepts a group invitation → status: ACTIVE
    */
@@ -199,13 +207,18 @@ export class GroupChatService {
     membership.respondedAt = new Date();
     await this.memberRepo.save(membership);
 
-    // Notify all ACTIVE members that someone joined
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    const activeMembers = await this.memberRepo.find({
-      where: { groupId, status: MemberStatus.ACTIVE },
-    });
+    // Lấy song song user info + active members + full group data
+    const [user, activeMembers, fullGroup] = await Promise.all([
+      this.userRepo.findOne({ where: { id: userId } }),
+      this.memberRepo.find({ where: { groupId, status: MemberStatus.ACTIVE } }),
+      this.groupRepo.findOne({
+        where: { id: groupId },
+        relations: ["members", "members.user", "createdBy"],
+      }),
+    ]);
 
-    await publishGroupNotification({
+    // ✅ Fire-and-forget — "member joined" notification không cần block
+    publishGroupNotification({
       event: "group:member:joined",
       targetUserIds: activeMembers
         .map((m) => m.userId)
@@ -214,14 +227,11 @@ export class GroupChatService {
         groupId,
         user: { id: user!.id, name: user!.name, avatar: user!.avatar },
       },
-    });
+    }).catch((err) =>
+      console.error("[acceptInvitation] publishGroupNotification error:", err)
+    );
 
     // Send the full group data to the new member so they can render it
-    const fullGroup = await this.groupRepo.findOne({
-      where: { id: groupId },
-      relations: ["members", "members.user", "createdBy"],
-    });
-
     try {
       const wsService = getWebSocketService();
       wsService.sendToUser(userId, "group:joined", { group: fullGroup });
@@ -245,20 +255,25 @@ export class GroupChatService {
     membership.respondedAt = new Date();
     await this.memberRepo.save(membership);
 
-    // Notify group admins
-    const admins = await this.memberRepo.find({
-      where: { groupId, role: GroupRole.ADMIN, status: MemberStatus.ACTIVE },
-    });
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    // Lấy song song admins + user info
+    const [admins, user] = await Promise.all([
+      this.memberRepo.find({
+        where: { groupId, role: GroupRole.ADMIN, status: MemberStatus.ACTIVE },
+      }),
+      this.userRepo.findOne({ where: { id: userId } }),
+    ]);
 
-    await publishGroupNotification({
+    // ✅ Fire-and-forget — admin notification không cần block response
+    publishGroupNotification({
       event: "group:invitation:rejected",
       targetUserIds: admins.map((a) => a.userId),
       data: {
         groupId,
         user: { id: user!.id, name: user!.name },
       },
-    });
+    }).catch((err) =>
+      console.error("[rejectInvitation] publishGroupNotification error:", err)
+    );
   }
 
   // Pending Invitations
@@ -357,6 +372,7 @@ export class GroupChatService {
   }
 
   // Messages
+
   async getGroupMessages(
     userId: string,
     groupId: string,
@@ -411,13 +427,25 @@ export class GroupChatService {
       throw new BadRequestError("fileUrl is required for media messages");
     }
 
-    if (replyToId) {
-      const target = await this.messageRepo.findOne({
-        where: { id: replyToId, groupId, isDeleted: false },
-      });
-      if (!target) throw new NotFoundError("Replied message not found");
+    // ✅ Chạy song song: validate replyTo + lấy sender info
+    const [replyTo, sender] = await Promise.all([
+      replyToId
+        ? this.messageRepo.findOne({
+            where: { id: replyToId, groupId, isDeleted: false },
+            select: ["id", "content", "senderId", "type", "isDeleted"],
+          })
+        : Promise.resolve(null),
+      this.userRepo.findOne({
+        where: { id: senderId },
+        select: ["id", "name", "avatar"],
+      }),
+    ]);
+
+    if (replyToId && !replyTo) {
+      throw new NotFoundError("Replied message not found");
     }
 
+    // Save message
     const message = this.messageRepo.create({
       groupId,
       senderId,
@@ -432,43 +460,89 @@ export class GroupChatService {
     });
     await this.messageRepo.save(message);
 
-    const fullMessage = await this.messageRepo.findOne({
-      where: { id: message.id },
-      relations: ["sender", "replyTo", "replyTo.sender", "seenBy"],
-    });
+    // ✅ Format ngay từ data đã có — không cần findOne với relations
+    const formatted = {
+      id: message.id,
+      groupId,
+      senderId,
+      senderName: sender?.name ?? "",
+      senderAvatar: sender?.avatar ?? null,
+      content: content || null,
+      type,
+      fileUrl: fileUrl || null,
+      fileName: fileName || null,
+      fileSize: fileSize || null,
+      fileMimeType: fileMimeType || null,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            content: replyTo.content,
+            senderId: replyTo.senderId,
+            isDeleted: replyTo.isDeleted,
+          }
+        : null,
+      seenBy: [],
+      seenByMe: true,
+      isDeleted: false,
+      createdAt: message.createdAt,
+    };
 
-    const formatted = this.formatMessage(fullMessage!, senderId);
-
-    // Update group last message preview
-    await this.groupRepo.update(groupId, {
-      lastMessage: type === MessageType.TEXT ? content : `[${type}]`,
-      lastMessageSenderId: senderId,
-      lastMessageAt: new Date(),
-    });
-
-    // Increment unread for all ACTIVE members (except sender)
-    const activeMembers = await this.memberRepo.find({
-      where: { groupId, status: MemberStatus.ACTIVE },
-    });
-
-    const otherActive = activeMembers.filter((m) => m.userId !== senderId);
-    for (const m of otherActive) m.unreadCount++;
-    if (otherActive.length > 0) await this.memberRepo.save(otherActive);
-
-    // Sender auto-marks message as seen
-    await this.markMessageSeen(senderId, message.id, groupId);
-
-    // Publish to MQ → workers will deliver via WS to ACTIVE members only
-    await publishGroupMessage({
+    // ✅ Deliver qua WebSocket NGAY — không chờ các side effects
+    const wsService = getWebSocketService();
+    wsService.sendToGroup(groupId, "group:message:new", {
       groupId,
       message: formatted,
-      senderUserId: senderId,
+    });
+
+    // ✅ Chạy song song tất cả side effects — không block response
+    Promise.all([
+      // Update group preview
+      this.groupRepo.update(groupId, {
+        lastMessage: type === MessageType.TEXT ? content : `[${type}]`,
+        lastMessageSenderId: senderId,
+        lastMessageAt: new Date(),
+      }),
+
+      // Increment unread + mark seen cho sender — gộp vào 1 query
+      this.incrementUnreadAndMarkSeen(senderId, groupId, message.id),
+
+      // Fire-and-forget MQ publish (audit log, push notification, etc.)
+      publishGroupMessage({
+        groupId,
+        message: formatted,
+        senderUserId: senderId,
+      }),
+    ]).catch((err) => {
+      console.error("[sendGroupMessage] side effects error:", err);
     });
 
     return formatted;
   }
 
-  // Upload Media
+  // ✅ Helper gộp unread increment + mark seen vào 1 DB roundtrip
+  private async incrementUnreadAndMarkSeen(
+    senderId: string,
+    groupId: string,
+    messageId: string
+  ): Promise<void> {
+    await Promise.all([
+      // Bulk increment unread cho các member khác bằng 1 UPDATE query
+      this.memberRepo
+        .createQueryBuilder()
+        .update(GroupMember)
+        .set({ unreadCount: () => "unread_count + 1" })
+        .where(
+          "group_id = :groupId AND user_id != :senderId AND status = :status",
+          { groupId, senderId, status: MemberStatus.ACTIVE }
+        )
+        .execute(),
+
+      // Mark seen cho sender
+      this.markMessageSeen(senderId, messageId, groupId),
+    ]);
+  }
+
+  //  Upload Media
 
   async uploadGroupMedia(
     userId: string,
@@ -482,7 +556,7 @@ export class GroupChatService {
     return uploadChatMedia(buffer, mimeType, originalName, fileSize);
   }
 
-  // Seen / Read Receipts
+  //  Seen / Read Receipts
 
   async markGroupAsRead(userId: string, groupId: string): Promise<void> {
     await this.assertActiveMember(userId, groupId);
@@ -514,14 +588,16 @@ export class GroupChatService {
       );
       await this.seenRepo.save(seenRecords);
 
-      // Notify others about seen status
-      await publishGroupNotification({
+      // ✅ Fire-and-forget — seen notification không cần block
+      publishGroupNotification({
         event: "group:messages:seen",
         targetUserIds: [
           ...new Set(unseenMessages.map((m) => m.senderId)),
         ].filter((id) => id !== userId),
         data: { groupId, seenBy: userId, seenAt: new Date() },
-      });
+      }).catch((err) =>
+        console.error("[markGroupAsRead] publishGroupNotification error:", err)
+      );
     }
   }
 
@@ -540,7 +616,7 @@ export class GroupChatService {
     }
   }
 
-  // Member Management
+  //  Member Management
 
   async addMembers(
     requesterId: string,
@@ -587,47 +663,46 @@ export class GroupChatService {
         existing.status === MemberStatus.LEFT ||
         existing.status === MemberStatus.REJECTED
       ) {
-        // Re-invite: reset membership to PENDING
         existing.status = MemberStatus.PENDING;
         existing.invitedAt = new Date();
         existing.invitedById = requesterId;
         existing.respondedAt = null as any;
         toReinvite.push(existing);
       } else {
-        // ACTIVE or PENDING → already in group or already has pending invite
         skipped.push(userId);
       }
     }
 
-    // Persist new memberships
-    if (toCreate.length > 0) {
-      const newMembers = toCreate.map((userId) =>
-        this.memberRepo.create({
-          groupId,
-          userId,
-          role: GroupRole.MEMBER,
-          status: MemberStatus.PENDING,
-          invitedAt: new Date(),
-          invitedById: requesterId,
-        })
-      );
-      await this.memberRepo.save(newMembers);
-    }
-
-    // Persist re-invites
-    if (toReinvite.length > 0) {
-      await this.memberRepo.save(toReinvite);
-    }
+    // Persist new memberships + re-invites song song
+    await Promise.all([
+      toCreate.length > 0
+        ? this.memberRepo.save(
+            toCreate.map((userId) =>
+              this.memberRepo.create({
+                groupId,
+                userId,
+                role: GroupRole.MEMBER,
+                status: MemberStatus.PENDING,
+                invitedAt: new Date(),
+                invitedById: requesterId,
+              })
+            )
+          )
+        : Promise.resolve(),
+      toReinvite.length > 0
+        ? this.memberRepo.save(toReinvite)
+        : Promise.resolve(),
+    ]);
 
     const allInvited = [...toCreate, ...toReinvite.map((m) => m.userId)];
 
-    // Only send WS notification if there's actually someone to notify
     if (allInvited.length > 0) {
       const requester = await this.userRepo.findOne({
         where: { id: requesterId },
       });
 
-      await publishGroupNotification({
+      // ✅ Fire-and-forget — invitation notify không cần block API response
+      publishGroupNotification({
         event: "group:invitation",
         targetUserIds: allInvited,
         data: {
@@ -640,7 +715,9 @@ export class GroupChatService {
           },
           actions: { accept: true, reject: true },
         },
-      });
+      }).catch((err) =>
+        console.error("[addMembers] publishGroupNotification error:", err)
+      );
     }
 
     return { invited: allInvited, skipped };
@@ -677,11 +754,14 @@ export class GroupChatService {
       where: { groupId, status: MemberStatus.ACTIVE },
     });
 
-    await publishGroupNotification({
+    // ✅ Fire-and-forget — member removed notify không cần block
+    publishGroupNotification({
       event: "group:member:removed",
       targetUserIds: [targetUserId, ...remaining.map((m) => m.userId)],
       data: { groupId, removedUserId: targetUserId, isSelf },
-    });
+    }).catch((err) =>
+      console.error("[removeMember] publishGroupNotification error:", err)
+    );
   }
 
   async promoteMember(
@@ -700,11 +780,14 @@ export class GroupChatService {
     membership.role = GroupRole.ADMIN;
     await this.memberRepo.save(membership);
 
-    await publishGroupNotification({
+    // ✅ Fire-and-forget — promote notify không cần block
+    publishGroupNotification({
       event: "group:member:promoted",
       targetUserIds: [targetUserId],
       data: { groupId, promotedUserId: targetUserId },
-    });
+    }).catch((err) =>
+      console.error("[promoteMember] publishGroupNotification error:", err)
+    );
   }
 
   async deleteGroupMessage(
@@ -730,7 +813,7 @@ export class GroupChatService {
     message.isDeleted = true;
     await this.messageRepo.save(message);
 
-    // Delete from Cloudinary if media
+    // Delete from Cloudinary if media — không cần block notify
     if (message.filePublicId) {
       const rt =
         message.type === MessageType.IMAGE
@@ -738,21 +821,43 @@ export class GroupChatService {
           : message.type === MessageType.VIDEO
             ? "video"
             : "raw";
-      await deleteChatMedia(message.filePublicId, rt as any);
+      // ✅ Fire-and-forget cloudinary delete + notification song song
+      Promise.all([
+        deleteChatMedia(message.filePublicId, rt as any),
+        this.memberRepo
+          .find({ where: { groupId, status: MemberStatus.ACTIVE } })
+          .then((activeMembers) =>
+            publishGroupNotification({
+              event: "group:message:deleted",
+              targetUserIds: activeMembers.map((m) => m.userId),
+              data: { groupId, messageId },
+            })
+          ),
+      ]).catch((err) =>
+        console.error("[deleteGroupMessage] side effects error:", err)
+      );
+    } else {
+      // Không có media — chỉ notify
+      this.memberRepo
+        .find({ where: { groupId, status: MemberStatus.ACTIVE } })
+        .then((activeMembers) =>
+          // ✅ Fire-and-forget
+          publishGroupNotification({
+            event: "group:message:deleted",
+            targetUserIds: activeMembers.map((m) => m.userId),
+            data: { groupId, messageId },
+          })
+        )
+        .catch((err) =>
+          console.error(
+            "[deleteGroupMessage] publishGroupNotification error:",
+            err
+          )
+        );
     }
-
-    const activeMembers = await this.memberRepo.find({
-      where: { groupId, status: MemberStatus.ACTIVE },
-    });
-
-    await publishGroupNotification({
-      event: "group:message:deleted",
-      targetUserIds: activeMembers.map((m) => m.userId),
-      data: { groupId, messageId },
-    });
   }
 
-  // WebSocket Sync on Reconnect
+  //  WebSocket Sync on Reconnect
 
   /**
    * Called when a user reconnects via WS. Sends them their current group state:
@@ -774,11 +879,11 @@ export class GroupChatService {
         syncedAt: new Date(),
       });
     } catch (err) {
-      console.error("syncOnReconnect error:", err);
+      console.error("[syncOnReconnect] error:", err);
     }
   }
 
-  // Helpers
+  //  Helpers
 
   private async assertActiveMember(
     userId: string,
