@@ -2,7 +2,7 @@ import { startGroupMessageWorker } from "./group-message.worker";
 import { startGroupNotificationWorker } from "./group-notification.worker";
 
 export { publishGroupMessage, publishGroupNotification } from "./group-chat.publisher";
-export type { GroupMessagePayload, GroupNotificationPayload } from "./group-chat.publisher";
+export type { GroupMessagePayload, GroupNotificationPayload } from "../../types/group-chat.types";
 
 export async function startAllWorkers(): Promise<void> {
   await Promise.all([

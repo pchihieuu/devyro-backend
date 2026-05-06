@@ -16,9 +16,9 @@ export enum GroupRole {
 }
 export enum MemberStatus {
   PENDING = "pending",
-  ACTIVE = "active", 
-  REJECTED = "rejected", 
-  LEFT = "left", 
+  ACTIVE = "active",
+  REJECTED = "rejected",
+  LEFT = "left",
   KICKED = "kicked",
 }
 @Entity("group_members")
@@ -26,10 +26,10 @@ export class GroupMember {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "group_id" })
   groupId: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
   @Column({
@@ -46,19 +46,19 @@ export class GroupMember {
   })
   status: MemberStatus;
 
-  @Column({ type: "int", default: 0 })
+  @Column({ type: "int", default: 0, name: "unread_count" })
   unreadCount: number;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamp", nullable: true, name: "last_read_at" })
   lastReadAt: Date | null;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamp", nullable: true, name: "invited_at" })
   invitedAt: Date | null;
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "uuid", nullable: true, name: "invited_by_id" })
   invitedById: string | null;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamp", nullable: true, name: "responded_at" })
   respondedAt: Date | null;
 
   @CreateDateColumn()
@@ -68,14 +68,14 @@ export class GroupMember {
   updatedAt: Date;
 
   @ManyToOne(() => Group, (group) => group.members, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "groupId" })
+  @JoinColumn({ name: "group_id" })
   group: Group;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "userId" })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "invitedById" })
+  @JoinColumn({ name: "invited_by_id" })
   invitedBy: User | null;
 }

@@ -23,10 +23,10 @@ export class GroupMessage {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "group_id" })
   groupId: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "sender_id" })
   senderId: string;
 
   @Column({ type: "text", nullable: true })
@@ -54,25 +54,25 @@ export class GroupMessage {
   @Column({ type: "varchar", nullable: true })
   fileMimeType: string | null;
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "uuid", nullable: true, name: "reply_to_id" })
   replyToId: string | null;
 
-  @Column({ type: "boolean", default: false })
+  @Column({ type: "boolean", default: false, name: "is_deleted" })
   isDeleted: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @ManyToOne(() => Group, (group) => group.messages, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "groupId" })
+  @JoinColumn({ name: "group_id" })
   group: Group;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "senderId" })
+  @JoinColumn({ name: "sender_id" })
   sender: User;
 
   @ManyToOne(() => GroupMessage, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn({ name: "replyToId" })
+  @JoinColumn({ name: "reply_to_id" })
   replyTo: GroupMessage | null;
 
   @OneToMany(() => GroupMessageSeen, (seen) => seen.message)

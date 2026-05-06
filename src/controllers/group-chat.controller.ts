@@ -4,7 +4,7 @@ import multer from "multer";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 });
 
 export const uploadMiddleware = upload.single("file");
@@ -40,6 +40,7 @@ export class GroupChatController {
       next(error);
     }
   }
+
   async getUserGroups(req: Request, res: Response, next: NextFunction) {
     try {
       const groups = await groupChatService.getUserGroups(req.user!.id);
@@ -121,6 +122,7 @@ export class GroupChatController {
         fileMimeType,
         replyToId,
       } = req.body;
+
       const message = await groupChatService.sendGroupMessage(
         req.user!.id,
         req.params.groupId,
@@ -202,27 +204,22 @@ export class GroupChatController {
         userIds
       );
 
-      // Build a human-readable message
       const { invited, skipped } = result;
-      let message = "";
+      let message: string;
       if (invited.length > 0 && skipped.length === 0) {
         message = `Đã gửi lời mời đến ${invited.length} thành viên`;
       } else if (invited.length > 0 && skipped.length > 0) {
         message = `Đã gửi lời mời đến ${invited.length} thành viên. ${skipped.length} người đã ở trong nhóm hoặc đã có lời mời.`;
       } else {
-        message =
-          "Tất cả người dùng đã ở trong nhóm hoặc đã có lời mời chờ xử lý.";
+        message = "Tất cả người dùng đã ở trong nhóm hoặc đã có lời mời chờ xử lý.";
       }
 
-      res.json({
-        success: true,
-        data: result,
-        message,
-      });
+      res.json({ success: true, data: result, message });
     } catch (error) {
       next(error);
     }
   }
+
   async removeMember(req: Request, res: Response, next: NextFunction) {
     try {
       await groupChatService.removeMember(
@@ -262,4 +259,5 @@ export class GroupChatController {
     }
   }
 }
+
 export const groupChatController = new GroupChatController();
