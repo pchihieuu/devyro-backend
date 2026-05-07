@@ -1,25 +1,41 @@
-import { AppDataSource } from "../../config/database.config";
 import { mqService, QueueName } from "../../services/message-queue.service";
-import { GroupMessagePayload } from "./group-chat.publisher";
+import { GroupMessagePayload } from "../../types/group-chat.types";
 
 /**
- * Worker: nhận message từ queue GROUP_MESSAGE,
- * chỉ deliver đến các ACTIVE member qua WebSocket.
+ * Worker: receives GroupMessagePayload from the GROUP_MESSAGE queue.
  *
- * Mỗi lần nhận message → query DB lấy active members → sendToUser từng người.
- * Worker này chạy độc lập, không block GroupNotificationWorker.
+ * WebSocket delivery is handled directly in GroupChatService.sendGroupMessage()
+ * immediately after the DB save — this worker is the extension point for
+ * async side-effects that must not block the HTTP response:
+ *
+ *   - Push notifications (FCM / APNs) for offline users
+ *   - Email digest for users who haven't been online for N hours
+ *   - Analytics / audit logging
+ *   - Full-text search indexing
+ *
+ * Add handlers inside processGroupMessage() using Promise.allSettled so that
+ * one failing handler never aborts the others.
  */
-
-// group-message.worker.ts — sau khi WS đã direct deliver
-// Worker giờ chỉ xử lý các tác vụ async như push notification, email digest, etc.
 export async function startGroupMessageWorker(): Promise<void> {
   await mqService.consume<GroupMessagePayload>(
     QueueName.GROUP_MESSAGE,
     async ({ payload }) => {
-      // WS đã được deliver trực tiếp trong service
-      // Worker này giờ dùng cho: push notification, email, analytics...
-      // await handlePushNotification(payload); // nếu có
+      await processGroupMessage(payload);
     }
   );
+
   console.log("GroupMessageWorker started");
+}
+
+async function processGroupMessage(payload: GroupMessagePayload): Promise<void> {
+  // Uncomment and implement as needed:
+  //
+  // await Promise.allSettled([
+  //   handlePushNotification(payload),
+  //   handleEmailDigest(payload),
+  //   handleAnalytics(payload),
+  //   handleSearchIndex(payload),
+  // ]);
+
+  void payload;
 }

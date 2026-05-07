@@ -20,10 +20,15 @@ export interface QueueMessage<T = unknown> {
 
 class MessageQueueService {
   private connection: ChannelModel | null = null;
-  /** Shared channel dùng cho publish (lightweight) */
   private publishChannel: Channel | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
+
+  /**
+   * Guard: setupExchangesAndQueues chỉ cần chạy 1 lần per connection.
+   * Các consumer channel tạo sau không cần assert lại.
+   */
+  private topologyReady = false;
 
   async connect(): Promise<void> {
     if (this.isConnecting || this.connection) return;
@@ -36,10 +41,11 @@ class MessageQueueService {
       this.connection = await amqplib.connect(url);
       this.publishChannel = await this.connection.createChannel();
 
+      // Setup topology 1 lần duy nhất trên publish channel
       await this.setupExchangesAndQueues(this.publishChannel);
+      this.topologyReady = true;
 
-      // Prefetch nhỏ cho publish channel (không consume)
-      await this.publishChannel.prefetch(1);
+      // publish channel KHÔNG cần prefetch — prefetch chỉ có nghĩa với consumer
 
       this.isConnecting = false;
       console.log("Connected to RabbitMQ");
@@ -61,13 +67,18 @@ class MessageQueueService {
   }
 
   /**
-   * Tạo một channel riêng dành cho consumer worker.
-   * Mỗi worker nên có channel độc lập để tránh head-of-line blocking.
+   * Tạo consumer channel riêng.
+   * Không gọi setupExchangesAndQueues lại — topology đã ready.
+   * Nếu topology chưa ready (edge case restart), gọi lại 1 lần.
    */
   async createConsumerChannel(prefetch = 10): Promise<Channel> {
     if (!this.connection) throw new Error("MQ not connected");
     const ch = await this.connection.createChannel();
-    await this.setupExchangesAndQueues(ch);
+
+    if (!this.topologyReady) {
+      await this.setupExchangesAndQueues(ch);
+    }
+
     await ch.prefetch(prefetch);
     return ch;
   }
@@ -75,46 +86,52 @@ class MessageQueueService {
   private async setupExchangesAndQueues(ch: Channel): Promise<void> {
     const TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-    await ch.assertExchange(ExchangeName.GROUP_EVENTS, "topic", {
-      durable: true,
-    });
-    await ch.assertExchange(ExchangeName.CHAT_EVENTS, "topic", {
-      durable: true,
-    });
+    // Chạy song song tất cả assertExchange — không phụ thuộc nhau
+    await Promise.all([
+      ch.assertExchange(ExchangeName.GROUP_EVENTS, "topic", { durable: true }),
+      ch.assertExchange(ExchangeName.CHAT_EVENTS, "topic", { durable: true }),
+    ]);
 
-    await ch.assertQueue(QueueName.GROUP_MESSAGE, {
-      durable: true,
-      arguments: { "x-message-ttl": TTL },
-    });
-    await ch.assertQueue(QueueName.GROUP_NOTIFICATION, {
-      durable: true,
-      arguments: { "x-message-ttl": TTL },
-    });
-    await ch.assertQueue(QueueName.CHAT_MESSAGE, {
-      durable: true,
-      arguments: { "x-message-ttl": TTL },
-    });
+    // Chạy song song tất cả assertQueue
+    await Promise.all([
+      ch.assertQueue(QueueName.GROUP_MESSAGE, {
+        durable: true,
+        arguments: { "x-message-ttl": TTL },
+      }),
+      ch.assertQueue(QueueName.GROUP_NOTIFICATION, {
+        durable: true,
+        arguments: { "x-message-ttl": TTL },
+      }),
+      ch.assertQueue(QueueName.CHAT_MESSAGE, {
+        durable: true,
+        arguments: { "x-message-ttl": TTL },
+      }),
+    ]);
 
-    await ch.bindQueue(
-      QueueName.GROUP_MESSAGE,
-      ExchangeName.GROUP_EVENTS,
-      "group.message.*"
-    );
-    await ch.bindQueue(
-      QueueName.GROUP_NOTIFICATION,
-      ExchangeName.GROUP_EVENTS,
-      "group.notification.*"
-    );
-    await ch.bindQueue(
-      QueueName.CHAT_MESSAGE,
-      ExchangeName.CHAT_EVENTS,
-      "chat.message.*"
-    );
+    // Chạy song song tất cả bindQueue
+    await Promise.all([
+      ch.bindQueue(
+        QueueName.GROUP_MESSAGE,
+        ExchangeName.GROUP_EVENTS,
+        "group.message.*"
+      ),
+      ch.bindQueue(
+        QueueName.GROUP_NOTIFICATION,
+        ExchangeName.GROUP_EVENTS,
+        "group.notification.*"
+      ),
+      ch.bindQueue(
+        QueueName.CHAT_MESSAGE,
+        ExchangeName.CHAT_EVENTS,
+        "chat.message.*"
+      ),
+    ]);
   }
 
   private reconnect(): void {
     this.connection = null;
     this.publishChannel = null;
+    this.topologyReady = false;
 
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = setTimeout(() => {
@@ -123,6 +140,10 @@ class MessageQueueService {
     }, 5000);
   }
 
+  /**
+   * Return boolean thay vì void-wrapped Promise.
+   * Caller có thể .catch() hoặc fire-and-forget tuỳ context.
+   */
   async publish<T>(
     exchange: ExchangeName,
     routingKey: string,
@@ -150,15 +171,10 @@ class MessageQueueService {
     }
   }
 
-  /**
-   * Consume từ queue với channel riêng (prefetch=10).
-   * Tự tạo consumer channel độc lập.
-   */
   async consume<T>(
     queue: QueueName,
     handler: (msg: QueueMessage<T>) => Promise<void>
   ): Promise<void> {
-    // Mỗi consumer worker tự tạo channel riêng
     const ch = await this.createConsumerChannel(10);
 
     await ch.consume(queue, async (msg) => {
@@ -169,7 +185,7 @@ class MessageQueueService {
         ch.ack(msg);
       } catch (error) {
         console.error(`Error processing message from ${queue}:`, error);
-        // Nack, không requeue (tránh infinite loop)
+        // Nack, không requeue — tránh poison message loop
         ch.nack(msg, false, false);
       }
     });

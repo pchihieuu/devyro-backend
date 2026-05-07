@@ -26,17 +26,25 @@ export class Group {
   @Column({ type: "varchar", nullable: true })
   avatar: string | null;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "created_by_id" })
   createdById: string;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: "text", nullable: true, name: "last_message" })
   lastMessage: string | null;
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "uuid", nullable: true, name: "last_message_sender_id" })
   lastMessageSenderId: string | null;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamp", nullable: true, name: "last_message_at" })
   lastMessageAt: Date | null;
+
+  /**
+   * Denormalized active member count — incremented/decremented atomically
+   * via UPDATE … SET member_count = member_count ± 1.
+   * Avoids a COUNT(*) query every time getUserGroups is called.
+   */
+  @Column({ type: "int", default: 0, name: "member_count" })
+  memberCount: number;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -45,7 +53,7 @@ export class Group {
   updatedAt: Date;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "createdById" })
+  @JoinColumn({ name: "created_by_id" })
   createdBy: User;
 
   @OneToMany(() => GroupMember, (member) => member.group)
