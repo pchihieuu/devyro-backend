@@ -1,21 +1,9 @@
 import { mqService, QueueName } from "../../services/message-queue.service";
+import { AppDataSource } from "../../config/database.config";
+import { GroupMember, MemberStatus } from "../../entities/GroupMember.entity";
+import { getWebSocketService } from "../../services/websocket.service";
 import { GroupMessagePayload } from "../../types/group-chat.types";
 
-/**
- * Worker: receives GroupMessagePayload from the GROUP_MESSAGE queue.
- *
- * WebSocket delivery is handled directly in GroupChatService.sendGroupMessage()
- * immediately after the DB save — this worker is the extension point for
- * async side-effects that must not block the HTTP response:
- *
- *   - Push notifications (FCM / APNs) for offline users
- *   - Email digest for users who haven't been online for N hours
- *   - Analytics / audit logging
- *   - Full-text search indexing
- *
- * Add handlers inside processGroupMessage() using Promise.allSettled so that
- * one failing handler never aborts the others.
- */
 export async function startGroupMessageWorker(): Promise<void> {
   await mqService.consume<GroupMessagePayload>(
     QueueName.GROUP_MESSAGE,
@@ -23,19 +11,33 @@ export async function startGroupMessageWorker(): Promise<void> {
       await processGroupMessage(payload);
     }
   );
-
   console.log("GroupMessageWorker started");
 }
 
 async function processGroupMessage(payload: GroupMessagePayload): Promise<void> {
-  // Uncomment and implement as needed:
-  //
-  // await Promise.allSettled([
-  //   handlePushNotification(payload),
-  //   handleEmailDigest(payload),
-  //   handleAnalytics(payload),
-  //   handleSearchIndex(payload),
-  // ]);
+  const { groupId, message, senderUserId } = payload;
 
-  void payload;
+  const memberRepo = AppDataSource.getRepository(GroupMember);
+  const members = await memberRepo.find({
+    where: { groupId, status: MemberStatus.ACTIVE },
+    select: ["userId"],
+  });
+
+  const wsService = getWebSocketService();
+
+  // Fan-out đến tất cả members TRỪ sender
+  // Sender đã được add optimistically trong sendGroupMessage (frontend)
+  // và message.id đã được pre-seed vào seenMessageIds → WS event sẽ bị de-dup
+  await Promise.allSettled(
+    members
+      .filter((m) => m.userId !== senderUserId)
+      .map((m) =>
+        Promise.resolve(
+          wsService.sendToUser(m.userId, "group:message:new", {
+            groupId,
+            message,
+          })
+        )
+      )
+  );
 }
