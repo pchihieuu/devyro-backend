@@ -60,7 +60,6 @@ export class WebSocketService {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
       console.log(`User connected: ${socket.userId}`);
 
-      
       if (socket.userId) {
         this.userSockets.set(socket.userId, socket.id);
         socket.join(`user:${socket.userId}`);
@@ -140,8 +139,17 @@ export class WebSocketService {
   }
 
   /** Send to specific user room */
+  // public sendToUser(userId: string, event: string, data: unknown) {
+  //   this.io.to(`user:${userId}`).emit(event, data);
+  // }
+
   public sendToUser(userId: string, event: string, data: unknown) {
-    this.io.to(`user:${userId}`).emit(event, data);
+    const room = `user:${userId}`;
+    const socketsInRoom = this.io.sockets.adapter.rooms.get(room);
+    console.log(
+      `[sendToUser] event=${event} userId=${userId} sockets=${socketsInRoom?.size ?? 0}`
+    );
+    this.io.to(room).emit(event, data);
   }
 
   /** Send to all members of a group room */

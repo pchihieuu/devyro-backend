@@ -9,7 +9,7 @@ export interface GroupUserRef {
   avatar: string | null;
 }
 
-// Message DTOs 
+// Message DTOs
 export interface GroupReplyDTO {
   id: string;
   content: string | null;
@@ -148,21 +148,28 @@ export interface GroupMessagesSeenData {
 export interface GroupMessageDeletedData {
   groupId: string;
   messageId: string;
+  previousMessage: {
+    id: string;
+    content: string | null;
+    type: MessageType;
+    senderId: string;
+    createdAt: Date;
+  } | null;
 }
 
 // Discriminated union for all notification events
 
 export type GroupNotificationEvent =
-  | { event: "group:invitation";          data: GroupInvitationData }
-  | { event: "group:updated";             data: GroupUpdatedData }
-  | { event: "group:member:joined";       data: GroupMemberJoinedData }
-  | { event: "group:member:removed";      data: GroupMemberRemovedData }
-  | { event: "group:member:promoted";     data: GroupMemberPromotedData }
+  | { event: "group:invitation"; data: GroupInvitationData }
+  | { event: "group:updated"; data: GroupUpdatedData }
+  | { event: "group:member:joined"; data: GroupMemberJoinedData }
+  | { event: "group:member:removed"; data: GroupMemberRemovedData }
+  | { event: "group:member:promoted"; data: GroupMemberPromotedData }
   | { event: "group:invitation:rejected"; data: GroupInvitationRejectedData }
-  | { event: "group:messages:seen";       data: GroupMessagesSeenData }
-  | { event: "group:message:deleted";     data: GroupMessageDeletedData };
+  | { event: "group:messages:seen"; data: GroupMessagesSeenData }
+  | { event: "group:message:deleted"; data: GroupMessageDeletedData };
 
-// MQ payloads 
+// MQ payloads
 
 export interface GroupMessagePayload {
   groupId: string;
@@ -178,7 +185,7 @@ export type GroupNotificationPayload = GroupNotificationEvent & {
   targetUserIds: string[];
 };
 
-// Paginated messages response 
+// Paginated messages response
 
 export interface GroupMessagesResult {
   messages: GroupMessageDTO[];
