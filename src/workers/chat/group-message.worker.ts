@@ -1,35 +1,3 @@
-// import { mqService, QueueName } from "../../services/message-queue.service";
-// import { AppDataSource } from "../../config/database.config";
-// import { GroupMember, MemberStatus } from "../../entities/GroupMember.entity";
-// import { getWebSocketService } from "../../services/websocket.service";
-// import { GroupMessagePayload } from "../../types/group-chat.types";
-
-// export async function startGroupMessageWorker(): Promise<void> {
-//   await mqService.consume<GroupMessagePayload>(
-//     QueueName.GROUP_MESSAGE,
-//     async ({ payload }) => {
-//       await processGroupMessage(payload);
-//     }
-//   );
-//   console.log("GroupMessageWorker started");
-// }
-
-// // group-message.worker.ts — REPLACE processGroupMessage
-// async function processGroupMessage(
-//   payload: GroupMessagePayload
-// ): Promise<void> {
-//   const { groupId, message } = payload;
-//   const wsService = getWebSocketService();
-
-//   // Dùng sendToGroup thay vì loop sendToUser
-//   // Frontend đã join room group:{groupId} qua socket.emit("group:join:room")
-//   wsService.sendToGroup(groupId, "group:message:new", { groupId, message });
-
-//   console.log(
-//     `[processGroupMessage] sent to group:${groupId} messageId=${message.id}`
-//   );
-// }
-
 import { mqService, QueueName } from "../../services/message-queue.service";
 import { getWebSocketService } from "../../services/websocket.service";
 import { GroupMessagePayload } from "../../types/group-chat.types";
@@ -45,27 +13,28 @@ export async function startGroupMessageWorker(): Promise<void> {
 }
 
 /**
- * BUG FIX: Trước đây dùng sendToUser loop cho từng member —
- * sai vì frontend join room group:{groupId} (không phải user:{id}).
- * sendToUser emit vào room user:{id}, nhưng khi user đang chat group
- * họ chỉ listen group:{groupId}, nên UserB/C không bao giờ nhận được.
+ * Chỉ dùng sendToGroup — không còn sendToUser fallback.
  *
- * Fix: dùng sendToGroup — emit 1 lần vào room group:{groupId},
- * tất cả member đang online đều nhận đồng thời.
+ * Lý do bỏ dual-delivery:
+ * - Frontend đã fix join room timing: socket emit "group:join:room" ngay
+ *   trong onSync handler (không chờ groupIdsKey effect re-run).
+ * - Dual-delivery gây mỗi receiver nhận 2 WS events cho cùng 1 message
+ *   → log "2 received" + "skipped duplicate" ở mọi user.
+ * - Frontend dedup (seenMessageIds) che giấu vấn đề nhưng không giải quyết
+ *   được root cause — waste bandwidth + CPU không cần thiết.
+ *
+ * sendToGroup emit 1 lần vào room group:{groupId}.
+ * Tất cả member đã join room đều nhận đồng thời — đủ và đúng.
  */
 async function processGroupMessage(
   payload: GroupMessagePayload
 ): Promise<void> {
   const { groupId, message } = payload;
-
   const wsService = getWebSocketService();
+
+  wsService.sendToGroup(groupId, "group:message:new", { groupId, message });
 
   console.log(
     `[processGroupMessage] sendToGroup groupId=${groupId} messageId=${message.id}`
   );
-
-  wsService.sendToGroup(groupId, "group:message:new", {
-    groupId,
-    message,
-  });
 }

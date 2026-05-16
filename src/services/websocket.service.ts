@@ -74,7 +74,7 @@ export class WebSocketService {
           groupChatService.syncOnReconnect(socket.userId!).catch((err) => {
             console.error("Error syncing group chat state on reconnect:", err);
           });
-        }, 500); // debounce 500ms
+        }, 100);
 
         this.syncDebounce.set(socket.userId, timeout);
       }
@@ -153,8 +153,16 @@ export class WebSocketService {
   }
 
   /** Send to all members of a group room */
+  // public sendToGroup(groupId: string, event: string, data: unknown) {
+  //   this.io.to(`group:${groupId}`).emit(event, data);
+  // }
   public sendToGroup(groupId: string, event: string, data: unknown) {
-    this.io.to(`group:${groupId}`).emit(event, data);
+    const room = `group:${groupId}`;
+    const sockets = this.io.sockets.adapter.rooms.get(room);
+    console.log(
+      `[sendToGroup] event=${event} groupId=${groupId} sockets_in_room=${sockets?.size ?? 0}`
+    );
+    this.io.to(room).emit(event, data);
   }
 
   public sendMessageToUser(
