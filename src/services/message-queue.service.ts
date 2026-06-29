@@ -89,8 +89,53 @@ class MessageQueueService {
     } catch (error) {
       this.isConnecting = false;
       console.error("Failed to connect to RabbitMQ:", error);
-      this.reconnect();
+      // Chỉ gọi reconnect() khi đang runtime (không phải startup).
+      // Khi startup, connectWithRetry() tự handle retry — không schedule ngầm ở đây.
     }
+  }
+
+  async connectWithRetry(maxAttempts = 10, delayMs = 3000): Promise<void> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      this.connection = null;
+      this.isConnecting = false;
+
+      await this.connect();
+
+      if (this.isConnected()) {
+        // Đăng ký reconnect handler cho runtime sau khi startup thành công
+        this.registerRuntimeReconnect();
+        return;
+      }
+      if (attempt < maxAttempts) {
+        console.log(
+          `[MQ] Attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms...`
+        );
+        await new Promise((res) => setTimeout(res, delayMs));
+      }
+    }
+
+    throw new Error(`[MQ] Could not connect after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Gọi sau khi startup connect thành công.
+   * Override event handlers để dùng reconnect() (silent retry) thay vì throw.
+   */
+
+  private registerRuntimeReconnect(): void {
+    if (!this.connection) return;
+
+    this.connection.removeAllListeners("error");
+    this.connection.removeAllListeners("close");
+
+    this.connection.on("error", (err) => {
+      console.error("RabbitMQ connection error:", err);
+      this.reconnect();
+    });
+    this.connection.on("close", () => {
+      console.warn("RabbitMQ connection closed. Reconnecting...");
+      this.reconnect();
+    });
   }
 
   async createConsumerChannel(prefetch = 10): Promise<Channel> {
@@ -129,9 +174,21 @@ class MessageQueueService {
     ]);
 
     await Promise.all([
-      ch.bindQueue(QueueName.GROUP_MESSAGE, ExchangeName.GROUP_EVENTS, "group.message.*"),
-      ch.bindQueue(QueueName.GROUP_NOTIFICATION, ExchangeName.GROUP_EVENTS, "group.notification.*"),
-      ch.bindQueue(QueueName.CHAT_MESSAGE, ExchangeName.CHAT_EVENTS, "chat.message.*"),
+      ch.bindQueue(
+        QueueName.GROUP_MESSAGE,
+        ExchangeName.GROUP_EVENTS,
+        "group.message.*"
+      ),
+      ch.bindQueue(
+        QueueName.GROUP_NOTIFICATION,
+        ExchangeName.GROUP_EVENTS,
+        "group.notification.*"
+      ),
+      ch.bindQueue(
+        QueueName.CHAT_MESSAGE,
+        ExchangeName.CHAT_EVENTS,
+        "chat.message.*"
+      ),
     ]);
   }
 
@@ -143,7 +200,9 @@ class MessageQueueService {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = setTimeout(() => {
       console.log("Attempting to reconnect to RabbitMQ...");
-      this.connect();
+      this.connect().then(() => {
+        if (this.isConnected()) this.registerRuntimeReconnect();
+      });
     }, 5000);
   }
 
@@ -157,7 +216,10 @@ class MessageQueueService {
     payload: T
   ): Promise<boolean> {
     if (!this.publishChannel) {
-      console.warn("[MQ] publish channel not ready, message dropped:", routingKey);
+      console.warn(
+        "[MQ] publish channel not ready, message dropped:",
+        routingKey
+      );
       return false;
     }
 
@@ -179,7 +241,9 @@ class MessageQueueService {
       if (!ok) {
         // Channel write buffer full — drain event will fire when ready
         // For now log so we can detect backpressure issues
-        console.warn(`[MQ] publish returned false for ${routingKey} — channel buffer full`);
+        console.warn(
+          `[MQ] publish returned false for ${routingKey} — channel buffer full`
+        );
       } else {
         console.log(`[MQ] published ${routingKey} OK`);
       }
@@ -214,6 +278,7 @@ class MessageQueueService {
 
   async close(): Promise<void> {
     try {
+      if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
       await this.publishChannel?.close();
       await this.connection?.close();
       console.log("RabbitMQ connection closed gracefully");

@@ -23,7 +23,7 @@ const startServer = async () => {
     console.log("Database initialized");
 
     // 2. Kết nối RabbitMQ — phải xong trước khi start workers
-    await mqService.connect();
+    await mqService.connectWithRetry(10, 3000);
     console.log("RabbitMQ connected");
 
     // 3. WebSocket service — workers cần getWebSocketService()
