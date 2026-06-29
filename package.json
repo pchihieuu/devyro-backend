@@ -17,9 +17,16 @@
     "migration:show": "npm run typeorm -- migration:show -d src/config/database.config.ts",
     "migration:run:prod": "cross-env NODE_ENV=production typeorm-ts-node-commonjs migration:run -d dist/config/database.config.js"
   },
+  "ts-node": {
+    "transpileOnly": true,
+    "esm": false,
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "node"
+    }
+  },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@types/amqplib": "^0.10.8",
     "amqplib": "^1.0.3",
     "axios": "^1.13.5",
     "bcryptjs": "^2.4.3",
@@ -36,7 +43,7 @@
     "jsonwebtoken": "9.0.2",
     "morgan": "^1.10.1",
     "multer": "^1.4.5-lts.1",
-    "node-cron": "^4.2.1",
+    "node-cron": "^3.0.3",
     "nodemailer": "^7.0.13",
     "pdf-parse": "^1.1.4",
     "pg": "^8.11.3",
@@ -50,6 +57,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.16",
@@ -61,7 +69,6 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.9",
     "@types/pdf-parse": "^1.1.5",
-    "@types/socket.io": "^3.0.1",
     "cross-env": "^10.1.0",
     "nodemon": "^3.0.1",
     "rimraf": "^6.1.3",
