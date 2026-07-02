@@ -175,12 +175,22 @@ export const triggerAIAnalysis = asyncHandler(
         data: result.analysis,
       });
     } catch (error: any) {
+      const statusCode = error.statusCode;
       // Distinguish quota errors from other errors
-      if (error.statusCode === 429 || error.message?.includes("quota")) {
+      if (statusCode === 429 || error.message?.includes("quota")) {
         res.status(429).json({
           success: false,
           message: "AI service quota exceeded. Please try again later.",
           retryAfter: 30,
+        });
+        return;
+      }
+      if (statusCode === 503 || error.message?.includes("overloaded")) {
+        res.status(503).json({
+          success: false,
+          message:
+            "AI service is currently overloaded. Please try again later.",
+          retryAfter: 60,
         });
         return;
       }
