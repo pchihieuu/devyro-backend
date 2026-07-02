@@ -84,39 +84,47 @@ export class GeminiAIMatchingService {
     let lastError: Error | null = null;
 
     for (const { name, instance } of this.models) {
-      try {
-        console.log(`Trying model: ${name}`);
-        this.model = instance; // switch active model
-        return await this.performAnalysis(resume, job);
-      } catch (error: any) {
-        lastError = error;
+      this.model = instance;
+      let attempt = 0;
 
-        // Reserve only when quota is exhausted (429)
-        if (error instanceof GeminiAPIError && error.statusCode === 429) {
-          console.warn(`Model ${name} quota exceeded, trying next model...`);
-          continue;
-        }
+      while (attempt <= GEMINI_CONFIG.MAX_RETRIES) {
+        try {
+          console.log(`Trying model: ${name} (attempt ${attempt + 1})`);
+          // this.model = instance; // switch active model
+          return await this.performAnalysis(resume, job);
+        } catch (error: any) {
+          lastError = error;
 
-        // Timeout → Retry that same model once.
-        if (error instanceof GeminiTimeoutError) {
-          console.warn(`Model ${name} timeout, retrying once...`);
-          try {
-            await this.delay(GEMINI_CONFIG.RETRY_DELAY_MS);
-            return await this.performAnalysis(resume, job);
-          } catch (retryError: any) {
-            lastError = retryError;
-            // If the timeout occurs a second time, it will fall back to a lighter model.
-            if (
-              retryError instanceof GeminiAPIError &&
-              retryError.statusCode === 429
-            ) {
-              continue;
-            }
-            break;
+          // Reserve only when quota is exhausted (429)
+          const isQuotaExceeded =
+            error instanceof GeminiAPIError && error.statusCode === 429;
+          const isOverloaded =
+            error instanceof GeminiAPIError && error.statusCode === 503;
+          const isTimeout = error instanceof GeminiTimeoutError;
+          if (isQuotaExceeded) {
+            console.warn(`Model ${name} quota exceeded, trying next model...`);
+            break; // no point retrying a quota-exhausted model
           }
-        }
 
-        break;
+          if (isOverloaded || isTimeout) {
+            attempt++;
+            if (attempt > GEMINI_CONFIG.MAX_RETRIES) {
+              console.warn(
+                `Model ${name} still unavailable after ${GEMINI_CONFIG.MAX_RETRIES} retries, trying next model...`
+              );
+              break; // move to next model
+            }
+            const backoff =
+              GEMINI_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+            console.warn(
+              `Model ${name} ${isOverloaded ? "overloaded (503)" : "timed out"}, retrying in ${backoff}ms...`
+            );
+
+            await this.delay(backoff);
+            continue;
+          }
+          throw error; // rethrow for other errors
+        }
       }
     }
 
@@ -226,6 +234,17 @@ export class GeminiAIMatchingService {
         error.code === 429
       ) {
         throw new GeminiAPIError("API quota exceeded", 429);
+      }
+
+      if (
+        error.status === 503 ||
+        error.status === "UNAVAILABLE" ||
+        error.message?.includes("503") ||
+        error.message?.includes("overloaded") ||
+        error.message?.includes("Service Unavailable") ||
+        error.message?.includes("high demand")
+      ) {
+        throw new GeminiAPIError("Gemini model is currently overloaded", 503);
       }
 
       if (error.status === 404 || error.message?.includes("not found")) {
