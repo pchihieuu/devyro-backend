@@ -6,6 +6,8 @@ providers:
     folder: "k6"
     type: file
     disableDeletion: false
-    editable: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    # editable: true
     options:
       path: /etc/grafana/provisioning/dashboards

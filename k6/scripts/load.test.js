@@ -105,7 +105,7 @@ export default function () {
   });
 
   group("2. Auth — Login", () => {
-    const token = login("test-host@gmail.com", "Hieudz1221");
+    const token = login("user-test@gmail.com", "Hieudz1221");
     if (!token) {
       sleep(2);
       return;
