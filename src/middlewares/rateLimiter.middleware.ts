@@ -28,7 +28,7 @@ export const apiLimiter = rateLimit({
 // Auth endpoints rate limiter - login, register, forgot password
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === "development" ? 10000 : 5,
   message: {
     success: false,
     message: "Too many authentication attempts, please try again later",
@@ -50,9 +50,7 @@ export const refreshTokenLimiter = rateLimit({
         const decoded = decodeToken(token);
         if (decoded?.id) return `refresh:userId:${decoded.id}`;
       }
-    } catch {
-   
-    }
+    } catch {}
     return `refresh:ip:${getClientIp(req)}`;
   },
   message: {
