@@ -10,19 +10,41 @@ import {
   getJobsEmployer,
 } from "../controllers/job.controller";
 import { ROUTES } from "../constants/routes";
+import {
+  createJobSchema,
+  employerJobsQuerySchema,
+  getJobByIdSchema,
+  getJobsSchema,
+  jobIdParamSchema,
+  updateJobSchema,
+} from "../validators/job.validator";
+import { validate } from "../middlewares/validation.middleware";
 
 const router = Router();
 
-router.get(ROUTES.JOBS.EMPLOYER_JOBS, protect, getJobsEmployer);
-router.patch(ROUTES.JOBS.TOGGLE_CLOSE, protect, toggleCloseJob);
+router.get(
+  ROUTES.JOBS.EMPLOYER_JOBS,
+  protect,
+  validate(employerJobsQuerySchema),
+  getJobsEmployer
+);
 
-router.route("/").post(protect, createJob).get(getJobs);
+router.patch(
+  ROUTES.JOBS.TOGGLE_CLOSE,
+  protect,
+  validate(jobIdParamSchema),
+  toggleCloseJob
+);
+
+router
+  .route("/")
+  .post(protect, validate(createJobSchema), createJob)
+  .get(validate(getJobsSchema), getJobs);
 
 router
   .route(ROUTES.JOBS.BY_ID)
-  .get(getJobById)
-  .put(protect, updateJob)
-  .delete(protect, deleteJob);
-
+  .get(validate(getJobByIdSchema), getJobById)
+  .put(protect, validate(updateJobSchema), updateJob)
+  .delete(protect, validate(jobIdParamSchema), deleteJob);
 
 export default router;

@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { JobType, JobLevel } from "../entities/Job.entity";
+import { createPaginationSchema } from "./common.validator";
 
+export const employerJobsQuerySchema = z.object({
+  query: createPaginationSchema([
+    "createdAt",
+    "title",
+    "salaryMin",
+    "salaryMax",
+  ] as const),
+});
 export const createJobSchema = z.object({
   body: z
     .object({
@@ -105,9 +114,8 @@ export const getJobsSchema = z.object({
   }),
 });
 
-export const employerJobsQuerySchema = z.object({
-  page: z.string().optional(),
-  limit: z.string().optional(),
-  sortBy: z.string().optional(),
-  order: z.enum(["asc", "desc"]).optional(),
+export const jobIdParamSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid job ID format"),
+  }),
 });
