@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
 import { savedJobService } from "../services/savedJob.service";
+import { buildPaginationMeta, PaginationOptions } from "../utils/pagination.util";
 
 export const saveJob = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
@@ -31,40 +32,54 @@ export const unsaveJob = asyncHandler(
 
 export const getMySavedJobs = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const {
-      page = "1",
-      limit = "12",
-      sortBy = "createdAt",
-      order = "desc",
-    } = req.query as {
-      page?: string;
-      limit?: string;
-      sortBy?: string;
-      order?: string;
-    };
-
-    const pagination = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sortBy,
-      order: order.toUpperCase() as "ASC" | "DESC",
-    };
-    const result = await savedJobService.getMySavedJobs(
-      req.user!.id,
-      pagination
-    );
+    // req.query đã là { page: number, limit: number, sortBy: string, order: "ASC"|"DESC" }
+    const pagination = req.query as unknown as PaginationOptions;
+    const result = await savedJobService.getMySavedJobs(req.user!.id, pagination);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: result.savedJobs,
-      pagination: {
-        currentPage: result.page,
-        totalPages: result.totalPages,
-        totalSavedJobs: result.total,
-        limit: pagination.limit,
-        hasNextPage: result.page < result.totalPages,
-        hasPrevPage: result.page > 1,
-      },
+      data: result.items,
+      pagination: buildPaginationMeta(result),
     });
   }
 );
+
+// export const getMySavedJobs = asyncHandler(
+//   async (req: Request, res: Response): Promise<void> => {
+//     const {
+//       page = "1",
+//       limit = "12",
+//       sortBy = "createdAt",
+//       order = "desc",
+//     } = req.query as {
+//       page?: string;
+//       limit?: string;
+//       sortBy?: string;
+//       order?: string;
+//     };
+
+//     const pagination = {
+//       page: parseInt(page),
+//       limit: parseInt(limit),
+//       sortBy,
+//       order: order.toUpperCase() as "ASC" | "DESC",
+//     };
+//     const result = await savedJobService.getMySavedJobs(
+//       req.user!.id,
+//       pagination
+//     );
+
+//     res.status(HTTP_STATUS.OK).json({
+//       success: true,
+//       data: result.items,
+//       pagination: {
+//         currentPage: result.page,
+//         totalPages: result.totalPages,
+//         totalSavedJobs: result.total,
+//         limit: pagination.limit,
+//         hasNextPage: result.page < result.totalPages,
+//         hasPrevPage: result.page > 1,
+//       },
+//     });
+//   }
+// );

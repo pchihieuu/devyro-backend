@@ -1,60 +1,48 @@
 import { AppDataSource } from "../config/database.config";
+import { Job } from "../entities/Job.entity";
 import { SavedJob } from "../entities/SavedJob.entity";
-import { ConflictError } from "../utils/errors";
+import { ConflictError, NotFoundError } from "../utils/errors";
+import {
+  getSkip,
+  buildPaginatedResult,
+  PaginationOptions,
+} from "../utils/pagination.util";
 
-interface PaginationOptions {
-  page: number;
-  limit: number;
-  sortBy: string;
-  order: "ASC" | "DESC";
-}
 export class SavedJobService {
   private savedJobRepository = AppDataSource.getRepository(SavedJob);
+  private jobRepository = AppDataSource.getRepository(Job);
 
   async saveJob(jobId: string, jobseekerId: string): Promise<SavedJob> {
-    // Check if already saved
+    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundError("Job not found");
+
     const exists = await this.savedJobRepository.findOne({
-      where: {
-        jobId,
-        jobseekerId,
-      },
+      where: { jobId, jobseekerId },
       withDeleted: true,
     });
 
-    if (exists && !exists.deletedAt) {
-      throw new ConflictError("Job already saved");
+    if (exists) {
+      if (!exists.deletedAt) throw new ConflictError("Job already saved");
+      return this.restoreSavedJob(exists.id);
     }
 
-    if (exists && exists.deletedAt) {
-      await this.savedJobRepository.restore(exists.id);
-      return exists;
-    }
-    const savedJob = this.savedJobRepository.create({
-      jobId,
-      jobseekerId,
-    });
+    const savedJob = this.savedJobRepository.create({ jobId, jobseekerId });
+    return this.savedJobRepository.save(savedJob);
+  }
 
-    return await this.savedJobRepository.save(savedJob);
+  private async restoreSavedJob(id: string): Promise<SavedJob> {
+    await this.savedJobRepository.restore(id);
+    const restored = await this.savedJobRepository.findOne({ where: { id } });
+    if (!restored) throw new NotFoundError("Failed to restore saved job");
+    return restored;
   }
 
   async unsaveJob(jobId: string, jobseekerId: string): Promise<void> {
-    await this.savedJobRepository.softDelete({
-      jobId,
-      jobseekerId,
-    });
+    await this.savedJobRepository.softDelete({ jobId, jobseekerId });
   }
 
-  async getMySavedJobs(
-    jobseekerId: string,
-    pagination: PaginationOptions
-  ): Promise<{
-    savedJobs: SavedJob[];
-    total: number;
-    page: number;
-    totalPages: number;
-  }> {
+  async getMySavedJobs(jobseekerId: string, pagination: PaginationOptions) {
     const { page, limit, sortBy, order } = pagination;
-    const skip = (page - 1) * limit;
 
     const [savedJobs, total] = await this.savedJobRepository.findAndCount({
       where: { jobseekerId },
@@ -76,15 +64,11 @@ export class SavedJobService {
         },
       },
       order: { [sortBy]: order },
-      skip,
+      skip: getSkip(page, limit),
       take: limit,
     });
-    return {
-      savedJobs,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    };
+
+    return buildPaginatedResult(savedJobs, total, page, limit);
   }
 }
 
