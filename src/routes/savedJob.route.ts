@@ -2,6 +2,7 @@ import { Router } from "express";
 import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
 import {
+  getMySavedJobsSchema,
   saveJobSchema,
   unsaveJobSchema,
 } from "../validators/savedJob.validator";
@@ -21,6 +22,6 @@ router.delete(
   validate(unsaveJobSchema),
   unsaveJob
 );
-router.get(ROUTES.SAVED_JOBS.MY, protect, getMySavedJobs);
+router.get(ROUTES.SAVED_JOBS.MY, protect, validate(getMySavedJobsSchema),getMySavedJobs);
 
 export default router;
