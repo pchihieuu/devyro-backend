@@ -1,4 +1,14 @@
 import { z } from "zod";
+import { createPaginationSchema } from "./common.validator";
+
+
+export const getAllCompaniesSchema = z.object({
+  query: z.object({
+    keyword: z.string().optional(),
+    industry: z.string().optional(),
+    size: z.string().optional(),
+  }).merge(createPaginationSchema(["createdAt", "name"] as const)),
+});
 
 export const createCompanySchema = z.object({
   body: z.object({
