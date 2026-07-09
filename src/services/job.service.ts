@@ -1,29 +1,13 @@
 import { AppDataSource } from "../config/database.config";
-import { Job, JobType, JobLevel } from "../entities/Job.entity";
+import { Job } from "../entities/Job.entity";
 import { SavedJob } from "../entities/SavedJob.entity";
 import { Application } from "../entities/Application.entity";
 import { Company } from "../entities/Company.entity";
-import { In, Like, LessThanOrEqual, MoreThanOrEqual, ILike } from "typeorm";
-import { NotFoundError, ForbiddenError } from "../utils/errors";
-
-interface JobFilters {
-  keyword?: string;
-  location?: string;
-  category?: string | string[];
-  type?: string | string[];
-  level?: string;
-  minSalary?: string;
-  maxSalary?: string;
-  skills?: string | string[];
-  userId?: string;
-}
-
-interface PaginationOptions {
-  page: number;
-  limit: number;
-  sortBy: string;
-  order: "ASC" | "DESC";
-}
+import { NotFoundError } from "../utils/errors";
+import { getSkip, buildPaginatedResult, PaginationOptions } from "../utils/pagination.util";
+import { ensureOwnership } from "../utils/authorization.util";
+import { jobRepository, JobFilters } from "../repositories/job.repository";
+import { companyService } from "./company.service";
 
 export class JobService {
   private jobRepository = AppDataSource.getRepository(Job);
@@ -32,252 +16,50 @@ export class JobService {
   private companyRepository = AppDataSource.getRepository(Company);
 
   async createJob(userId: string, jobData: Partial<Job>): Promise<Job> {
-    let company = await this.companyRepository.findOne({
-      where: { employerId: userId },
-    });
-
+    const company = await this.companyRepository.findOne({ where: { employerId: userId } });
     if (!company) {
-      throw new NotFoundError(
-        "Company profile not found. Please create a company profile first."
-      );
+      throw new NotFoundError("Company profile not found. Please create a company profile first.");
     }
 
-    const job = this.jobRepository.create({
-      ...jobData,
-      companyId: company.id,
-    });
-
+    const job = this.jobRepository.create({ ...jobData, companyId: company.id });
     const savedJob = await this.jobRepository.save(job);
-
-    await this.updateCompanyStats(company.id);
-
+    await companyService.updateCompanyStats(company.id);
     return savedJob;
   }
 
-  async getJobs(
-    filters: JobFilters,
-    pagination: PaginationOptions
-  ): Promise<{
-    jobs: any[];
-    total: number;
-    page: number;
-    totalPages: number;
-  }> {
-    const { page, limit, sortBy, order } = pagination;
-    const skip = (page - 1) * limit;
+  async getJobs(filters: JobFilters & { userId?: string }, pagination: PaginationOptions) {
+    const [jobs, total] = await jobRepository.search(filters, pagination);
 
-    const where: any = { isClosed: false };
-
-    if (filters.keyword) {
-      where.title = ILike(`%${filters.keyword}%`);
-    }
-
-    if (filters.location) {
-      where.location = ILike(`%${filters.location}%`);
-    }
-
-    if (filters.category) {
-      const categories = Array.isArray(filters.category)
-        ? filters.category
-        : [filters.category];
-      where.category = In(categories);
-    }
-
-    if (filters.type) {
-      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
-      where.type = In(types as JobType[]);
-    }
-
-    if (filters.level) {
-      where.level = filters.level as JobLevel;
-    }
-
-    if (filters.minSalary && filters.maxSalary) {
-      const minSalary = Number(filters.minSalary);
-      const maxSalary = Number(filters.maxSalary);
-      where.salaryMax = MoreThanOrEqual(minSalary);
-      where.salaryMin = LessThanOrEqual(maxSalary);
-    } else if (filters.minSalary) {
-      where.salaryMax = MoreThanOrEqual(Number(filters.minSalary));
-    } else if (filters.maxSalary) {
-      where.salaryMin = LessThanOrEqual(Number(filters.maxSalary));
-    }
-
-    const skillList: string[] = filters.skills
-      ? (Array.isArray(filters.skills)
-          ? filters.skills
-          : [filters.skills]
-        ).filter(Boolean)
-      : [];
-
-    let jobs: Job[];
-    let total: number;
-
-    if (skillList.length > 0) {
-      // Use QueryBuilder so we can add one LIKE per skill (AND logic —
-      // jobs must contain ALL selected skills)
-      const qb = this.jobRepository
-        .createQueryBuilder("job")
-        .leftJoinAndSelect("job.company", "company")
-        .leftJoinAndSelect("company.employer", "employer")
-        .select([
-          "job",
-          "company.id",
-          "company.name",
-          "company.logo",
-          "company.industry",
-          "company.size",
-        ])
-        .where("job.isClosed = :isClosed", { isClosed: false });
-
-      if (filters.keyword)
-        qb.andWhere("job.title ILIKE :keyword", {
-          keyword: `%${filters.keyword}%`,
-        });
-      if (filters.location)
-        qb.andWhere("job.location ILIKE :location", {
-          location: `%${filters.location}%`,
-        });
-      if (filters.category) {
-        const cats = Array.isArray(filters.category)
-          ? filters.category
-          : [filters.category];
-        qb.andWhere("job.category IN (:...categories)", { categories: cats });
-      }
-      if (filters.type) {
-        const types = Array.isArray(filters.type)
-          ? filters.type
-          : [filters.type];
-        qb.andWhere("job.type IN (:...types)", { types });
-      }
-      if (filters.level)
-        qb.andWhere("job.level = :level", { level: filters.level });
-      if (filters.minSalary && filters.maxSalary) {
-        qb.andWhere(
-          "job.salaryMax >= :minSalary AND job.salaryMin <= :maxSalary",
-          {
-            minSalary: Number(filters.minSalary),
-            maxSalary: Number(filters.maxSalary),
-          }
-        );
-      } else if (filters.minSalary) {
-        qb.andWhere("job.salaryMax >= :minSalary", {
-          minSalary: Number(filters.minSalary),
-        });
-      } else if (filters.maxSalary) {
-        qb.andWhere("job.salaryMin <= :maxSalary", {
-          maxSalary: Number(filters.maxSalary),
-        });
-      }
-
-      skillList.forEach((skill, i) => {
-        const paramKey = `skill_${i}`;
-        qb.andWhere(
-          `(job.skills ILIKE :${paramKey}_start OR job.skills ILIKE :${paramKey}_middle OR job.skills ILIKE :${paramKey}_exact)`,
-          {
-            [`${paramKey}_start`]: `${skill},%`,
-            [`${paramKey}_middle`]: `%,${skill},%`,
-            [`${paramKey}_exact`]: skill,
-          }
-        );
-      });
-
-      qb.orderBy(`job.${sortBy}`, order).skip(skip).take(limit);
-      [jobs, total] = await qb.getManyAndCount();
-    } else {
-      [jobs, total] = await this.jobRepository.findAndCount({
-        where,
-        relations: ["company", "company.employer"],
-        select: {
-          company: {
-            id: true,
-            name: true,
-            logo: true,
-            industry: true,
-            size: true,
-          },
-        },
-        order: { [sortBy]: order },
-        skip,
-        take: limit,
-      });
-    }
-
-    let jobsWithExtras = jobs;
-
+    let jobsWithExtras: any[] = jobs;
     if (filters.userId) {
-      const savedJobIds = await this.getSavedJobIds(filters.userId);
-      const appliedJobStatusMap = await this.getApplicationStatusMap(
-        filters.userId
-      );
-
+      const [savedJobIds, statusMap] = await Promise.all([
+        this.getSavedJobIds(filters.userId),
+        this.getApplicationStatusMap(filters.userId),
+      ]);
       jobsWithExtras = jobs.map((job) => ({
         ...job,
         isSaved: savedJobIds.includes(job.id),
-        applicationStatus: appliedJobStatusMap[job.id] || null,
+        applicationStatus: statusMap[job.id] || null,
       }));
     }
 
-    return {
-      jobs: jobsWithExtras,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    };
+    return buildPaginatedResult(jobsWithExtras, total, pagination.page, pagination.limit);
   }
 
-  async getJobsEmployer(
-    employerId: string,
-    pagination: PaginationOptions
-  ): Promise<{
-    jobs: Job[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-  }> {
+  async getJobsEmployer(employerId: string, pagination: PaginationOptions) {
     const { page, limit, sortBy, order } = pagination;
-    const skip = (page - 1) * limit;
-
-    const company = await this.companyRepository.findOne({
-      where: { employerId },
-    });
-
-    if (!company) {
-      return {
-        jobs: [],
-        pagination: {
-          page,
-          limit,
-          total: 0,
-          totalPages: 0,
-        },
-      };
-    }
+    const company = await this.companyRepository.findOne({ where: { employerId } });
+    if (!company) return buildPaginatedResult<Job>([], 0, page, limit);
 
     const [jobs, total] = await this.jobRepository.findAndCount({
-      where: {
-        companyId: company.id,
-      },
+      where: { companyId: company.id },
       relations: ["company"],
-      order: {
-        [sortBy]: order,
-      },
-      skip,
+      order: { [sortBy]: order },
+      skip: getSkip(page, limit),
       take: limit,
     });
 
-    return {
-      jobs,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return buildPaginatedResult(jobs, total, page, limit);
   }
 
   async getJobById(jobId: string, userId?: string): Promise<any> {
@@ -286,122 +68,63 @@ export class JobService {
       relations: ["company", "company.employer"],
       select: {
         company: {
-          id: true,
-          name: true,
-          logo: true,
-          size: true,
-          industry: true,
-          address: true,
-          website: true,
-          description: true,
-          benefits: true,
-          foundedYear: true,
+          id: true, name: true, logo: true, size: true, industry: true,
+          address: true, website: true, description: true, benefits: true, foundedYear: true,
         },
       },
     });
+    if (!job) throw new NotFoundError("Job not found");
 
-    if (!job) {
-      throw new NotFoundError("Job not found");
-    }
-
-    let applicationStatus = null;
+    let applicationStatus: string | null = null;
     let isSaved = false;
 
     if (userId) {
-      const application = await this.applicationRepository.findOne({
-        where: { jobId: job.id, applicantId: userId },
-        select: ["status"],
-      });
-
-      if (application) {
-        applicationStatus = application.status;
-      }
-
-      const savedJobRecord = await this.savedJobRepository.findOne({
-        where: { jobId: job.id, jobseekerId: userId },
-      });
-
-      if (savedJobRecord) {
-        isSaved = true;
-      }
+      const [application, savedJobRecord] = await Promise.all([
+        this.applicationRepository.findOne({
+          where: { jobId: job.id, applicantId: userId },
+          select: ["status"],
+        }),
+        this.savedJobRepository.findOne({ where: { jobId: job.id, jobseekerId: userId } }),
+      ]);
+      applicationStatus = application?.status ?? null;
+      isSaved = !!savedJobRecord;
     }
 
-    return {
-      ...job,
-      applicationStatus,
-      isSaved,
-    };
+    return { ...job, applicationStatus, isSaved };
   }
 
-  async updateJob(
-    jobId: string,
-    userId: string,
-    updates: Partial<Job>
-  ): Promise<Job> {
-    const job = await this.jobRepository.findOne({
-      where: { id: jobId },
-      relations: ["company"],
-    });
-
-    if (!job) {
-      throw new NotFoundError("Job not found");
-    }
-
-    if (job.company.employerId !== userId) {
-      throw new ForbiddenError("Not authorized to update this job");
-    }
-
+  async updateJob(jobId: string, userId: string, updates: Partial<Job>): Promise<Job> {
+    const job = await this.getJobWithCompanyOrThrow(jobId);
+    ensureOwnership(job.company.employerId, userId, "Not authorized to update this job");
     Object.assign(job, updates);
-    return await this.jobRepository.save(job);
+    return this.jobRepository.save(job);
   }
 
   async deleteJob(jobId: string, userId: string): Promise<void> {
-    const job = await this.jobRepository.findOne({
-      where: { id: jobId },
-      relations: ["company"],
-    });
-
-    if (!job) {
-      throw new NotFoundError("Job not found");
-    }
-
-    if (job.company.employerId !== userId) {
-      throw new ForbiddenError("Not authorized to delete this job");
-    }
-
+    const job = await this.getJobWithCompanyOrThrow(jobId);
+    ensureOwnership(job.company.employerId, userId, "Not authorized to delete this job");
     await this.jobRepository.softDelete(jobId);
-
-    await this.updateCompanyStats(job.companyId);
+    await companyService.updateCompanyStats(job.companyId);
   }
 
-  async toggleJobStatus(
-    jobId: string,
-    userId: string
-  ): Promise<{ message: string; isClosed: boolean }> {
-    const job = await this.jobRepository.findOne({
-      where: { id: jobId },
-      relations: ["company"],
-    });
-
-    if (!job) {
-      throw new NotFoundError("Job not found");
-    }
-
-    if (job.company.employerId !== userId) {
-      throw new ForbiddenError("Not authorized to modify this job");
-    }
+  async toggleJobStatus(jobId: string, userId: string): Promise<{ message: string; isClosed: boolean }> {
+    const job = await this.getJobWithCompanyOrThrow(jobId);
+    ensureOwnership(job.company.employerId, userId, "Not authorized to modify this job");
 
     job.isClosed = !job.isClosed;
     await this.jobRepository.save(job);
-
-    await this.updateCompanyStats(job.companyId);
+    await companyService.updateCompanyStats(job.companyId);
 
     return {
-      message: job.isClosed
-        ? "Job closed successfully"
-        : "Job opened successfully",
+      message: job.isClosed ? "Job closed successfully" : "Job opened successfully",
       isClosed: job.isClosed,
     };
+  }
+
+  private async getJobWithCompanyOrThrow(jobId: string): Promise<Job> {
+    const job = await this.jobRepository.findOne({ where: { id: jobId }, relations: ["company"] });
+    if (!job) throw new NotFoundError("Job not found");
+    return job;
   }
 
   private async getSavedJobIds(userId: string): Promise<string[]> {
@@ -412,35 +135,15 @@ export class JobService {
     return savedJobs.map((s) => s.jobId);
   }
 
-  private async getApplicationStatusMap(
-    userId: string
-  ): Promise<{ [key: string]: string }> {
+  private async getApplicationStatusMap(userId: string): Promise<Record<string, string>> {
     const applications = await this.applicationRepository.find({
       where: { applicantId: userId },
       select: ["jobId", "status"],
     });
-
-    const statusMap: { [key: string]: string } = {};
-    applications.forEach((app) => {
-      statusMap[app.jobId] = app.status;
-    });
-
-    return statusMap;
-  }
-
-  private async updateCompanyStats(companyId: string): Promise<void> {
-    const totalJobs = await this.jobRepository.count({
-      where: { companyId },
-    });
-
-    const activeJobs = await this.jobRepository.count({
-      where: { companyId, isClosed: false },
-    });
-
-    await this.companyRepository.update(companyId, {
-      totalJobs,
-      activeJobs,
-    });
+    return applications.reduce((map, app) => {
+      map[app.jobId] = app.status;
+      return map;
+    }, {} as Record<string, string>);
   }
 }
 

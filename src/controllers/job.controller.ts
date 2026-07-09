@@ -74,7 +74,7 @@ export const getJobs = asyncHandler(
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: result.jobs,
+      data: result.items,
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
@@ -101,23 +101,25 @@ export const getJobsEmployer = asyncHandler(
     } = req.query;
     const orderRaw = typeof order === "string" ? order : "desc";
 
-    const result = await jobService.getJobsEmployer(req.user!.id, {
+    const pagination = {
       page: Number(page),
       limit: Number(limit),
       sortBy: sortBy as string,
       order: orderRaw.toUpperCase() as "ASC" | "DESC",
-    });
+    };
+
+    const result = await jobService.getJobsEmployer(req.user!.id, pagination);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: result.jobs,
+      data: result.items,
       pagination: {
-        currentPage: result.pagination.page,
-        totalPages: result.pagination.totalPages,
-        total: result.pagination.total,
-        limit: result.pagination.limit,
-        hasNextPage: result.pagination.page < result.pagination.totalPages,
-        hasPrevPage: result.pagination.page > 1,
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        total: result.total,
+        limit: pagination.limit,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
       },
     });
   }
