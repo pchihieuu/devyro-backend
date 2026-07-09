@@ -6,6 +6,7 @@ import {
   updateCompanySchema,
   getCompanyByIdSchema,
   getCompanyJobsSchema,
+  getAllCompaniesSchema,
 } from "../validators/company.validator";
 import {
   createCompany,
@@ -24,7 +25,7 @@ import upload from "../middlewares/upload.middleware";
 const router = Router();
 
 // Public routes
-router.get("/", getAllCompanies);
+router.get("/", validate(getAllCompaniesSchema), getAllCompanies);
 
 router.get(ROUTES.COMPANIES.MY, protect, getMyCompany);
 
@@ -50,8 +51,14 @@ router.put(
   updateCompany
 );
 
-router.delete(ROUTES.COMPANIES.BY_ID, protect, deleteCompany);
+router.delete(ROUTES.COMPANIES.BY_ID, protect, validate(getCompanyByIdSchema), deleteCompany);
 
-router.post(ROUTES.COMPANIES.UPLOAD_LOGO, protect, uploadLimiter, upload.single("image"), uploadCompanyLogo)
+router.post(
+  ROUTES.COMPANIES.UPLOAD_LOGO,
+  protect,
+  uploadLimiter,
+  upload.single("image"),
+  uploadCompanyLogo
+);
 
 export default router;

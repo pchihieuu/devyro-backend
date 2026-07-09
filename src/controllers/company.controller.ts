@@ -5,6 +5,10 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
 import { ForbiddenError, BadRequestError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
+import {
+  buildPaginationMeta,
+  PaginationOptions,
+} from "../utils/pagination.util";
 
 interface CompanyFilterQuery {
   keyword?: string;
@@ -34,42 +38,18 @@ export const createCompany = asyncHandler(
 
 export const getAllCompanies = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const {
-      keyword,
-      industry,
-      size,
-      page = "1",
-      limit = "12",
-      sortBy = "createdAt",
-      order = "desc",
-    } = req.query as CompanyFilterQuery;
+    const { keyword, industry, size, page, limit, sortBy, order } =
+      req.query as unknown as CompanyFilterQuery & PaginationOptions;
 
-    const filters = {
-      keyword,
-      industry,
-      size,
-    };
-
-    const pagination = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sortBy,
-      order: order.toUpperCase() as "ASC" | "DESC",
-    };
-
-    const result = await companyService.getAllCompanies(filters, pagination);
+    const result = await companyService.getAllCompanies(
+      { keyword, industry, size },
+      { page, limit, sortBy, order }
+    );
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: result.companies,
-      pagination: {
-        currentPage: result.page,
-        totalPages: result.totalPages,
-        total: result.total,
-        limit: pagination.limit,
-        hasNextPage: result.page < result.totalPages,
-        hasPrevPage: result.page > 1,
-      },
+      data: result.items,
+      pagination: buildPaginationMeta(result),
     });
   }
 );
@@ -123,7 +103,7 @@ export const getCompanyJobs = asyncHandler(
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: result.jobs,
+      data: result.items,
       pagination: {
         currentPage: result.page,
         totalPages: result.totalPages,
