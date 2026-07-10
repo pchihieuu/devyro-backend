@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { JobType, JobLevel } from "../entities/Job.entity";
 import { createPaginationSchema } from "./common.validator";
+import { stripHtmlLength } from "../utils/htmlStrip.util";
 
 export const employerJobsQuerySchema = z.object({
   query: createPaginationSchema([
@@ -10,6 +11,14 @@ export const employerJobsQuerySchema = z.object({
     "salaryMax",
   ] as const),
 });
+
+// Field dùng chung cho description/requirement: validate theo nội dung
+// thật sau khi strip HTML (dùng `he` decode entity), không đếm markup.
+const richTextField = (label: string) =>
+  z.string().refine((val) => stripHtmlLength(val) >= 20, {
+    message: `${label} must be at least 20 characters`,
+  });
+
 export const createJobSchema = z.object({
   body: z
     .object({
@@ -17,12 +26,8 @@ export const createJobSchema = z.object({
         .string()
         .min(5, "Title must be at least 5 characters")
         .max(500, "Title must not exceed 500 characters"),
-      description: z
-        .string()
-        .min(20, "Description must be at least 20 characters"),
-      requirement: z
-        .string()
-        .min(20, "Requirements must be at least 20 characters"),
+      description: richTextField("Description"),
+      requirement: richTextField("Requirements"),
       location: z
         .string()
         .min(2, "Location must be at least 2 characters")
@@ -33,11 +38,11 @@ export const createJobSchema = z.object({
         .max(255, "Category must not exceed 255 characters"),
       type: z.nativeEnum(JobType),
       level: z.nativeEnum(JobLevel).optional(),
-      salaryMin: z
+      salaryMin: z.coerce
         .number()
         .positive("Minimum salary must be positive")
         .optional(),
-      salaryMax: z
+      salaryMax: z.coerce
         .number()
         .positive("Maximum salary must be positive")
         .optional(),
@@ -64,14 +69,20 @@ export const updateJobSchema = z.object({
   body: z
     .object({
       title: z.string().min(5).max(500).optional(),
-      description: z.string().min(20).optional(),
-      requirement: z.string().min(20).optional(),
+      description: richTextField("Description").optional(),
+      requirement: richTextField("Requirements").optional(),
       location: z.string().min(2).max(255).optional(),
       category: z.string().min(2).max(255).optional(),
       type: z.nativeEnum(JobType).optional(),
       level: z.nativeEnum(JobLevel).optional(),
-      salaryMin: z.number().positive().optional(),
-      salaryMax: z.number().positive().optional(),
+      salaryMin: z.coerce
+        .number()
+        .positive("Minimum salary must be positive")
+        .optional(),
+      salaryMax: z.coerce
+        .number()
+        .positive("Maximum salary must be positive")
+        .optional(),
     })
     .refine(
       (data) => {
