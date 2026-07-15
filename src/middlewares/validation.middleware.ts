@@ -1,3 +1,4 @@
+// validation.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema, ZodError, ZodIssue } from "zod";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
@@ -7,6 +8,7 @@ interface ValidateData {
   query?: any;
   params?: any;
 }
+
 export const validate =
   (schema: ZodSchema) =>
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -17,15 +19,15 @@ export const validate =
         params: req.params,
       })) as ValidateData;
 
+      // req.body vẫn là property ghi được bình thường ở cả Express 4 và 5
       if (validated.body !== undefined) {
         req.body = validated.body;
       }
-      if (validated.query !== undefined) {
-        req.query = validated.query;
-      }
-      if (validated.params !== undefined) {
-        req.params = validated.params;
-      }
+
+      // req.query là getter-only từ Express 5 -> KHÔNG được gán lại.
+      // Lưu kết quả đã validate/transform vào property riêng, tách khỏi req.query gốc.
+      req.validatedQuery = validated.query;
+      req.validatedParams = validated.params;
 
       next();
     } catch (error) {

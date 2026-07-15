@@ -1,211 +1,123 @@
-import { AppDataSource } from "../config/database.config";
-import {
-  User,
-  UserRole,
-  WorkPreference,
-  AvailabilityStatus,
-} from "../entities/User.entity";
 import {
   deleteFromCloudinary,
   extractPublicId,
 } from "../utils/cloudinary.utils";
+import { User, UserRole } from "../entities/User.entity";
 import {
   NotFoundError,
   ForbiddenError,
   BadRequestError,
 } from "../utils/errors";
-import { ILike, Not } from "typeorm";
-
-interface UpdateProfileData {
-  name?: string;
-  avatar?: string;
-  resume?: string;
-  username?: string;
-  title?: string;
-  bio?: string;
-  location?: string;
-  workPreference?: WorkPreference;
-  hourlyRateMin?: number;
-  hourlyRateMax?: number;
-  responseTimeHours?: number;
-  availabilityStatus?: AvailabilityStatus;
-  skills?: string[];
-  experience?: {
-    title: string;
-    company: string;
-    companyLink?: string;
-    description: string;
-    startDate: string;
-    endDate?: string;
-  }[];
-  projects?: {
-    title: string;
-    description: string;
-    technologies: string[];
-    link?: string;
-    image?: string;
-  }[];
-}
+import { userRepository } from "../repositories/user.repository";
+import {
+  UpdateProfileData,
+  ExperienceItem,
+  ProjectItem,
+} from "../types/user.types";
+import {
+  buildPaginatedResult,
+  getSkip,
+  PaginatedResult,
+} from "../utils/pagination.util";
 
 export class UserService {
-  private userRepository = AppDataSource.getRepository(User);
+  async updateProfile(
+    userId: string,
+    data: UpdateProfileData
+  ): Promise<Partial<User>> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
 
-  /**
-   * Update user profile (comprehensive)
-   */
-  async updateProfile(userId: string, data: UpdateProfileData): Promise<Partial<User>> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
+    // Check quyền trước khi mutate bất cứ gì
+    if (data.resume !== undefined && user.role !== UserRole.JOBSEEKER) {
+      throw new ForbiddenError("Only jobseekers can update resume");
     }
 
-    // Basic fields
-    if (data.name !== undefined && data.name.trim() !== "") {
+    // Fix: validate hourlyRateMin/Max trên giá trị SAU KHI MERGE với DB.
+    // Zod refine ở schema chỉ thấy payload của request này, không biết giá trị cũ trong DB,
+    // nên partial update (chỉ gửi 1 trong 2 field) có thể tạo ra min > max mà không bị chặn.
+    if (data.hourlyRateMin !== undefined || data.hourlyRateMax !== undefined) {
+      const nextMin =
+        data.hourlyRateMin !== undefined
+          ? data.hourlyRateMin
+          : user.hourlyRateMin;
+      const nextMax =
+        data.hourlyRateMax !== undefined
+          ? data.hourlyRateMax
+          : user.hourlyRateMax;
+      if (nextMin != null && nextMax != null && nextMax < nextMin) {
+        throw new BadRequestError(
+          "Maximum rate must be greater than or equal to minimum rate"
+        );
+      }
+    }
+
+    // Lưu URL cũ để xoá SAU khi save DB thành công, tránh mất file mồ côi
+    // nếu save() throw giữa chừng (mất kết nối DB, constraint lỗi...).
+    const oldAvatar = user.avatar;
+    const oldResume = user.resume;
+    const avatarChanged =
+      data.avatar !== undefined && data.avatar !== oldAvatar;
+    const resumeChanged =
+      data.resume !== undefined && data.resume !== oldResume;
+
+    if (data.name !== undefined && data.name.trim() !== "")
       user.name = data.name;
-    }
+    if (avatarChanged) user.avatar = data.avatar!;
+    if (resumeChanged) user.resume = data.resume!;
 
-    // Username validation
-    if (data.username !== undefined) {
-      if (data.username.trim() !== "") {
-        // Check if username is already taken by another user
-        const existingUser = await this.userRepository.findOne({
-          where: {
-            username: data.username,
-            id: Not(userId),
-          },
-        });
+    // "" nghĩa là chủ đích xoá field, khác với `name` (bỏ qua nếu rỗng)
+    if (data.title !== undefined) user.title = data.title || null;
+    if (data.bio !== undefined) user.bio = data.bio || null;
+    if (data.location !== undefined) user.location = data.location || null;
 
-        if (existingUser) {
-          throw new BadRequestError("Username already taken");
-        }
-
-        user.username = data.username;
-      } else {
-        user.username = null;
-      }
-    }
-
-    // Avatar handling
-    if (data.avatar !== undefined) {
-      if (data.avatar !== user.avatar) {
-        await this.deleteOldFile(user.avatar, "image");
-        user.avatar = data.avatar;
-      }
-    }
-
-    // Resume handling (jobseekers only)
-    if (data.resume !== undefined) {
-      if (user.role !== UserRole.JOBSEEKER) {
-        throw new ForbiddenError("Only jobseekers can update resume");
-      }
-
-      if (data.resume !== user.resume) {
-        await this.deleteOldFile(user.resume, "raw");
-        user.resume = data.resume;
-      }
-    }
-
-    // Professional fields
-    if (data.title !== undefined) {
-      user.title = data.title || null;
-    }
-
-    if (data.bio !== undefined) {
-      user.bio = data.bio || null;
-    }
-
-    if (data.location !== undefined) {
-      user.location = data.location || null;
-    }
-
-    if (data.workPreference !== undefined) {
-      user.workPreference = data.workPreference || null;
-    }
-
-    // Rate fields
-    if (data.hourlyRateMin !== undefined) {
+    if (data.hourlyRateMin !== undefined)
       user.hourlyRateMin = data.hourlyRateMin;
-    }
-
-    if (data.hourlyRateMax !== undefined) {
+    if (data.hourlyRateMax !== undefined)
       user.hourlyRateMax = data.hourlyRateMax;
-    }
-
-    if (data.responseTimeHours !== undefined) {
+    if (data.responseTimeHours !== undefined)
       user.responseTimeHours = data.responseTimeHours;
-    }
-
-    if (data.availabilityStatus !== undefined) {
+    if (data.availabilityStatus !== undefined)
       user.availabilityStatus = data.availabilityStatus;
-    }
+    if (data.skills !== undefined) user.skills = data.skills;
+    if (data.experience !== undefined) user.experience = data.experience;
+    if (data.projects !== undefined) user.projects = data.projects;
 
-    // Skills
-    if (data.skills !== undefined) {
-      user.skills = data.skills;
-    }
+    const saved = await userRepository.save(user);
 
-    // Experience
-    if (data.experience !== undefined) {
-      user.experience = data.experience;
-    }
+    // Chỉ xoá file cũ SAU KHI save DB chắc chắn thành công
+    if (avatarChanged) await this.deleteOldFile(oldAvatar, "image");
+    if (resumeChanged) await this.deleteOldFile(oldResume, "raw");
 
-    // Projects
-    if (data.projects !== undefined) {
-      user.projects = data.projects;
-    }
-
-    await this.userRepository.save(user);
-
-    return this.getMyProfile(userId);
+    return this.toMyProfileDto(saved);
   }
 
-  /**
-   * Delete jobseeker's resume
-   */
   async deleteResume(userId: string): Promise<void> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
     if (user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can delete resume");
     }
+    if (!user.resume) throw new NotFoundError("No resume found to delete");
 
-    if (!user.resume) {
-      throw new NotFoundError("No resume found to delete");
-    }
-
-    await this.deleteOldFile(user.resume, "raw");
-
+    const oldResume = user.resume;
     user.resume = null;
-    await this.userRepository.save(user);
+    await userRepository.save(user);
+
+    // Xoá file sau khi save DB thành công, cùng nguyên tắc với updateProfile
+    await this.deleteOldFile(oldResume, "raw");
   }
 
-  /**
-   * Get public user profile (full profile with all details)
-   */
   async getPublicProfile(userId: string): Promise<Partial<User>> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ["company"],
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    const user = await userRepository.findByIdWithCompany(userId);
+    if (!user) throw new NotFoundError("User not found");
 
     return {
       id: user.id,
       name: user.name,
-      email: user.email,
       role: user.role,
       avatar: user.avatar || "",
-      resume: user.resume || "",
+      resume: user.role === UserRole.JOBSEEKER ? user.resume || "" : undefined,
       username: user.username,
       title: user.title,
       bio: user.bio,
@@ -227,264 +139,147 @@ export class UserService {
     };
   }
 
-  /**
-   * Get own profile (authenticated user)
-   */
   async getMyProfile(userId: string): Promise<Partial<User>> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ["company"],
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatar: true,
-        resume: true,
-        username: true,
-        title: true,
-        bio: true,
-        location: true,
-        workPreference: true,
-        hourlyRateMin: true,
-        hourlyRateMax: true,
-        completionRate: true,
-        totalProjects: true,
-        responseTimeHours: true,
-        availabilityStatus: true,
-        skills: true,
-        experience: true,
-        projects: true,
-        rating: true,
-        reviewCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
+    const user = await userRepository.findByIdSelectProfile(userId);
     if (!user) throw new NotFoundError("User not found");
-
     return user;
   }
 
-  /**
-   * Search users by name or email (for chat)
-   */
+  private toMyProfileDto(user: User): Partial<User> {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      resume: user.resume,
+      username: user.username,
+      title: user.title,
+      bio: user.bio,
+      location: user.location,
+      workPreference: user.workPreference,
+      hourlyRateMin: user.hourlyRateMin,
+      hourlyRateMax: user.hourlyRateMax,
+      completionRate: user.completionRate,
+      totalProjects: user.totalProjects,
+      responseTimeHours: user.responseTimeHours,
+      availabilityStatus: user.availabilityStatus,
+      skills: user.skills,
+      experience: user.experience,
+      projects: user.projects,
+      rating: user.rating,
+      reviewCount: user.reviewCount,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
   async searchUsers(
     query: string,
     currentUserId: string,
     page: number = 1,
     limit: number = 20
-  ): Promise<{ users: Partial<User>[]; total: number }> {
-    const skip = (page - 1) * limit;
-
-    const [users, total] = await this.userRepository.findAndCount({
-      where: [
-        { name: ILike(`%${query}%`) },
-        { email: ILike(`%${query}%`) },
-        { username: ILike(`%${query}%`) },
-      ],
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-        role: true,
-        username: true,
-        title: true,
-        availabilityStatus: true,
-      },
-      take: limit,
+  ): Promise<PaginatedResult<Partial<User>>> {
+    const skip = getSkip(page, limit);
+    const [users, total] = await userRepository.searchUsers(
+      query,
+      currentUserId,
       skip,
-    });
-
-    // Filter out current user
-    const filteredUsers = users.filter((user) => user.id !== currentUserId);
-
-    return {
-      users: filteredUsers,
-      total: filteredUsers.length,
-    };
+      limit
+    );
+    return buildPaginatedResult(users, total, page, limit);
   }
 
-  /**
-   * Add experience to profile
-   */
   async addExperience(
     userId: string,
-    experience: {
-      title: string;
-      company: string;
-      companyLink?: string;
-      description: string;
-      startDate: string;
-      endDate?: string;
-    }
+    experience: ExperienceItem
   ): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
 
     const experiences = user.experience || [];
     experiences.push(experience);
     user.experience = experiences;
 
-    await this.userRepository.save(user);
-
-    return user;
+    return userRepository.save(user);
   }
 
-  /**
-   * Update experience
-   */
   async updateExperience(
     userId: string,
     index: number,
-    experience: {
-      title: string;
-      company: string;
-      companyLink?: string;
-      description: string;
-      startDate: string;
-      endDate?: string;
-    }
+    experience: ExperienceItem
   ): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
     if (!user.experience || index >= user.experience.length || index < 0) {
       throw new BadRequestError("Invalid experience index");
     }
 
     user.experience[index] = experience;
-
-    await this.userRepository.save(user);
-
-    return user;
+    return userRepository.save(user);
   }
 
-  /**
-   * Delete experience
-   */
   async deleteExperience(userId: string, index: number): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
     if (!user.experience || index >= user.experience.length || index < 0) {
       throw new BadRequestError("Invalid experience index");
     }
 
     user.experience.splice(index, 1);
-
-    await this.userRepository.save(user);
-
-    return user;
+    return userRepository.save(user);
   }
 
-  /**
-   * Add project to profile
-   */
-  async addProject(
-    userId: string,
-    project: {
-      title: string;
-      description: string;
-      technologies: string[];
-      link?: string;
-      image?: string;
-    }
-  ): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+  async addProject(userId: string, project: ProjectItem): Promise<User> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
 
     const projects = user.projects || [];
     projects.push(project);
     user.projects = projects;
 
-    await this.userRepository.save(user);
-
-    return user;
+    return userRepository.save(user);
   }
 
-  /**
-   * Update project
-   */
   async updateProject(
     userId: string,
     index: number,
-    project: {
-      title: string;
-      description: string;
-      technologies: string[];
-      link?: string;
-      image?: string;
-    }
+    project: ProjectItem
   ): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
     if (!user.projects || index >= user.projects.length || index < 0) {
       throw new BadRequestError("Invalid project index");
     }
 
-    // Delete old project image if it exists and is being replaced
-    if (
-      user.projects[index].image &&
-      project.image !== user.projects[index].image
-    ) {
-      await this.deleteOldFile(user.projects[index].image, "image");
-    }
+    const oldImage = user.projects[index].image;
+    const imageChanged = !!oldImage && project.image !== oldImage;
 
     user.projects[index] = project;
+    const saved = await userRepository.save(user);
 
-    await this.userRepository.save(user);
+    // Xoá ảnh cũ sau khi save thành công (đồng nhất nguyên tắc với updateProfile)
+    if (imageChanged) await this.deleteOldFile(oldImage, "image");
 
-    return user;
+    return saved;
   }
 
-  /**
-   * Delete project
-   */
   async deleteProject(userId: string, index: number): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
     if (!user.projects || index >= user.projects.length || index < 0) {
       throw new BadRequestError("Invalid project index");
     }
 
-    // Delete project image if it exists
-    if (user.projects[index].image) {
-      await this.deleteOldFile(user.projects[index].image, "image");
-    }
-
+    const oldImage = user.projects[index].image;
     user.projects.splice(index, 1);
+    const saved = await userRepository.save(user);
 
-    await this.userRepository.save(user);
+    if (oldImage) await this.deleteOldFile(oldImage, "image");
 
-    return user;
+    return saved;
   }
 
-  /**
-   * Delete old file from Cloudinary
-   */
   private async deleteOldFile(
     fileUrl: string | null | undefined,
     resourceType: "image" | "raw"
@@ -501,50 +296,36 @@ export class UserService {
     }
   }
 
-  /**
-   * Update avatar only - optimized single query
-   */
   async updateAvatar(userId: string, newAvatarUrl: string): Promise<void> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      select: ["id", "avatar"], // Chỉ lấy field cần thiết
-    });
+    const user = await userRepository.findByIdSelect(userId, ["id", "avatar"]);
+    if (!user) throw new NotFoundError("User not found");
 
-    if (!user) {
-      throw new NotFoundError("User not found");
+    const oldAvatar = user.avatar;
+    await userRepository.updateFields(userId, { avatar: newAvatarUrl });
+
+    if (oldAvatar && oldAvatar !== newAvatarUrl) {
+      await this.deleteOldFile(oldAvatar, "image");
     }
-
-    // Xóa ảnh cũ trên Cloudinary nếu khác ảnh mới
-    if (user.avatar && user.avatar !== newAvatarUrl) {
-      await this.deleteOldFile(user.avatar, "image");
-    }
-
-    await this.userRepository.update(userId, { avatar: newAvatarUrl });
   }
 
-  /**
-   * Update resume only - optimized single query
-   */
   async updateResume(userId: string, newResumeUrl: string): Promise<void> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      select: ["id", "resume", "role"], // Chỉ lấy field cần thiết
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    const user = await userRepository.findByIdSelect(userId, [
+      "id",
+      "resume",
+      "role",
+    ]);
+    if (!user) throw new NotFoundError("User not found");
 
     if (user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can update resume");
     }
 
-    // Xóa resume cũ trên Cloudinary nếu khác resume mới
-    if (user.resume && user.resume !== newResumeUrl) {
-      await this.deleteOldFile(user.resume, "raw");
-    }
+    const oldResume = user.resume;
+    await userRepository.updateFields(userId, { resume: newResumeUrl });
 
-    await this.userRepository.update(userId, { resume: newResumeUrl });
+    if (oldResume && oldResume !== newResumeUrl) {
+      await this.deleteOldFile(oldResume, "raw");
+    }
   }
 }
 

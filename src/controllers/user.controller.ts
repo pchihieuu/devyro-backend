@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { userService } from "../services/user.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { sendPaginated } from "../utils/http-response.util";
 
 export const updateProfile = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
@@ -50,29 +51,17 @@ export const getMyProfile = asyncHandler(
 
 export const searchUsers = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const query = req.query.q as string;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const { q, page, limit } = req.validatedQuery as {
+      q: string;
+      page: number;
+      limit: number;
+    };
 
-    if (!query || query.trim() === "") {
-      res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: "Search query is required",
-      });
-      return;
-    }
+    const result = await userService.searchUsers(q, req.user!.id, page, limit);
 
-    const result = await userService.searchUsers(
-      query,
-      req.user!.id,
-      page,
-      limit
-    );
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result,
-    });
+    // Dùng chung helper -> mọi API phân trang trong hệ thống (job, company, user...)
+    // trả về đúng 1 format JSON, không cần nhớ gọi buildPaginationMeta ở từng nơi.
+    sendPaginated(res, result);
   }
 );
 
@@ -90,7 +79,7 @@ export const addExperience = asyncHandler(
 
 export const updateExperience = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const index = parseInt(req.params.index);
+    const { index } = req.validatedParams as { index: number };
     const user = await userService.updateExperience(
       req.user!.id,
       index,
@@ -107,7 +96,7 @@ export const updateExperience = asyncHandler(
 
 export const deleteExperience = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const index = parseInt(req.params.index);
+    const { index } = req.validatedParams as { index: number };
     const user = await userService.deleteExperience(req.user!.id, index);
 
     res.status(HTTP_STATUS.OK).json({
@@ -132,7 +121,7 @@ export const addProject = asyncHandler(
 
 export const updateProject = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const index = parseInt(req.params.index);
+    const { index } = req.validatedParams as { index: number };
     const user = await userService.updateProject(req.user!.id, index, req.body);
 
     res.status(HTTP_STATUS.OK).json({
@@ -145,7 +134,7 @@ export const updateProject = asyncHandler(
 
 export const deleteProject = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const index = parseInt(req.params.index);
+    const { index } = req.validatedParams as { index: number };
     const user = await userService.deleteProject(req.user!.id, index);
 
     res.status(HTTP_STATUS.OK).json({
