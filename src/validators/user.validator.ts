@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-
 export const WorkPreferenceEnum = z.enum(["onsite", "remote", "hybrid"]);
 export const AvailabilityStatusEnum = z.enum([
   "available",
@@ -56,7 +55,6 @@ const projectSchema = z.object({
 export const updateProfileSchema = z.object({
   body: z
     .object({
-      // Basic fields
       name: z
         .string()
         .min(2, "Name must be at least 2 characters")
@@ -64,47 +62,29 @@ export const updateProfileSchema = z.object({
         .optional(),
 
       avatar: z.string().url("Invalid avatar URL").optional().or(z.literal("")),
-
       resume: z.string().url("Invalid resume URL").optional().or(z.literal("")),
-
-      // New profile fields
-      username: z
-        .string()
-        .min(3, "Username must be at least 3 characters")
-        .max(50, "Username must not exceed 50 characters")
-        .regex(
-          /^[a-zA-Z0-9_]+$/,
-          "Username can only contain letters, numbers, and underscores"
-        )
-        .optional()
-        .or(z.literal("")),
 
       title: z
         .string()
         .max(100, "Title must not exceed 100 characters")
         .optional()
         .or(z.literal("")),
-
       bio: z
         .string()
         .max(2000, "Bio must not exceed 2000 characters")
         .optional()
         .or(z.literal("")),
-
       location: z
         .string()
         .max(255, "Location must not exceed 255 characters")
         .optional()
         .or(z.literal("")),
 
-      workPreference: WorkPreferenceEnum.optional().or(z.literal("")),
-
       hourlyRateMin: z
         .number()
         .min(0, "Hourly rate must be positive")
         .optional()
         .or(z.null()),
-
       hourlyRateMax: z
         .number()
         .min(0, "Hourly rate must be positive")
@@ -124,50 +104,10 @@ export const updateProfileSchema = z.object({
         .array(z.string().max(50, "Skill name must not exceed 50 characters"))
         .max(50, "Maximum 50 skills allowed")
         .optional(),
-
-      experience: z
-        .array(experienceSchema)
-        .max(20, "Maximum 20 experiences allowed")
-        .optional(),
-
-      projects: z
-        .array(projectSchema)
-        .max(50, "Maximum 50 projects allowed")
-        .optional(),
-
-      // Company fields (for employers)
-      companyName: z
-        .string()
-        .min(2, "Company name must be at least 2 characters")
-        .max(200, "Company name must not exceed 200 characters")
-        .optional(),
-
-      companyDescription: z
-        .string()
-        .max(1000, "Company description must not exceed 1000 characters")
-        .optional(),
-
-      companyLogo: z
-        .string()
-        .url("Invalid company logo URL")
-        .optional()
-        .or(z.literal("")),
-
-      companySize: z.string().max(50).optional(),
-
-      companyIndustry: z.string().max(100).optional(),
-
-      companyAddress: z.string().max(255).optional(),
-
-      companyWebsite: z
-        .string()
-        .url("Invalid website URL")
-        .optional()
-        .or(z.literal("")),
     })
+    .strip()
     .refine(
       (data) => {
-        // Validate that hourlyRateMax >= hourlyRateMin if both are provided
         if (
           data.hourlyRateMin !== undefined &&
           data.hourlyRateMax !== undefined &&
@@ -182,10 +122,8 @@ export const updateProfileSchema = z.object({
         message: "Maximum rate must be greater than or equal to minimum rate",
         path: ["hourlyRateMax"],
       }
-    )
-    .strip(),
+    ),
 });
-
 // Delete resume schema
 export const deleteResumeSchema = z.object({
   body: z.object({}).optional(),
@@ -238,33 +176,18 @@ export const addExperienceSchema = z.object({
 
 export const updateExperienceSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid experience ID format"),
   }),
-  body: experienceSchema.refine(
-    (data) => {
-      if (data.startDate && data.endDate) {
-        const start = new Date(data.startDate);
-        const end = new Date(data.endDate);
-        return end >= start;
-      }
-      return true;
-    },
-    {
-      message: "End date must be after start date",
-      path: ["endDate"],
-    }
-  ),
+  body: experienceSchema
+    .partial()
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided",
+    }),
 });
 
 export const deleteExperienceSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid experience ID format"),
   }),
 });
 
@@ -275,20 +198,16 @@ export const addProjectSchema = z.object({
 
 export const updateProjectSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid project ID format"),
   }),
-  body: projectSchema,
+  body: projectSchema.partial().refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided",
+  }),
 });
 
 export const deleteProjectSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid project ID format"),
   }),
 });
 

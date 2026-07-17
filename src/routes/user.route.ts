@@ -45,7 +45,7 @@ router.get(
   getMyProfile
 );
 
-router.put(
+router.patch(
   ROUTES.USERS.UPDATE_PROFILE,
   protect,
   validate(updateProfileSchema),
@@ -66,15 +66,15 @@ router.post(
   addExperience
 );
 
-router.put(
-  ROUTES.USERS.EXPERIENCE_BY_INDEX,
+router.patch(
+  ROUTES.USERS.EXPERIENCE_BY_ID,
   protect,
   validate(updateExperienceSchema),
   updateExperience
 );
 
 router.delete(
-  ROUTES.USERS.EXPERIENCE_BY_INDEX,
+  ROUTES.USERS.EXPERIENCE_BY_ID,
   protect,
   validate(deleteExperienceSchema),
   deleteExperience
@@ -87,15 +87,15 @@ router.post(
   addProject
 );
 
-router.put(
-  ROUTES.USERS.PROJECT_BY_INDEX,
+router.patch(
+  ROUTES.USERS.PROJECT_BY_ID,
   protect,
   validate(updateProjectSchema),
   updateProject
 );
 
 router.delete(
-  ROUTES.USERS.PROJECT_BY_INDEX,
+  ROUTES.USERS.PROJECT_BY_ID,
   protect,
   validate(deleteProjectSchema),
   deleteProject

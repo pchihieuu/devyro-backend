@@ -4,6 +4,9 @@ declare global {
   namespace Express {
     interface Request {
       user?: User;
+      // Kết quả sau khi Zod parse + transform (page/limit thành number, index thành number...)
+      validatedQuery?: Record<string, any>;
+      validatedParams?: Record<string, any>;
     }
   }
 }
