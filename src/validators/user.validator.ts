@@ -104,18 +104,8 @@ export const updateProfileSchema = z.object({
         .array(z.string().max(50, "Skill name must not exceed 50 characters"))
         .max(50, "Maximum 50 skills allowed")
         .optional(),
-
-      experience: z
-        .array(experienceSchema)
-        .max(20, "Maximum 20 experiences allowed")
-        .optional(),
-
-      projects: z
-        .array(projectSchema)
-        .max(50, "Maximum 50 projects allowed")
-        .optional(),
     })
-    .strip() // ✅ strip TRƯỚC refine
+    .strip()
     .refine(
       (data) => {
         if (
@@ -186,33 +176,18 @@ export const addExperienceSchema = z.object({
 
 export const updateExperienceSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid experience ID format"),
   }),
-  body: experienceSchema.refine(
-    (data) => {
-      if (data.startDate && data.endDate) {
-        const start = new Date(data.startDate);
-        const end = new Date(data.endDate);
-        return end >= start;
-      }
-      return true;
-    },
-    {
-      message: "End date must be after start date",
-      path: ["endDate"],
-    }
-  ),
+  body: experienceSchema
+    .partial()
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided",
+    }),
 });
 
 export const deleteExperienceSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid experience ID format"),
   }),
 });
 
@@ -223,20 +198,16 @@ export const addProjectSchema = z.object({
 
 export const updateProjectSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid project ID format"),
   }),
-  body: projectSchema,
+  body: projectSchema.partial().refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided",
+  }),
 });
 
 export const deleteProjectSchema = z.object({
   params: z.object({
-    index: z
-      .string()
-      .regex(/^\d+$/, "Index must be a number")
-      .transform((val) => parseInt(val, 10)),
+    id: z.string().uuid("Invalid project ID format"),
   }),
 });
 

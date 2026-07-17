@@ -29,6 +29,6 @@ export interface UpdateProfileData {
   responseTimeHours?: number;
   availabilityStatus?: AvailabilityStatus;
   skills?: string[];
-  experience?: ExperienceItem[];
-  projects?: ProjectItem[];
 }
+export type ExperienceUpdateItem = Partial<ExperienceItem>;
+export type ProjectUpdateItem = Partial<ProjectItem>;

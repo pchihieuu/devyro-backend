@@ -33,6 +33,7 @@ export enum AvailabilityStatus {
 }
 
 interface Experience {
+  id: string;
   title: string;
   company: string;
   companyLink?: string;
@@ -42,6 +43,7 @@ interface Experience {
 }
 
 interface Project {
+  id: string;
   title: string;
   description: string;
   technologies: string[];

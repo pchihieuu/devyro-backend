@@ -31,9 +31,9 @@ export const ROUTES = {
     DELETE_RESUME: "/resume",
     SEARCH: "/search",
     EXPERIENCE: "/experience",
-    EXPERIENCE_BY_INDEX: "/experience/:index",
+    EXPERIENCE_BY_ID: "/experience/:id",
     PROJECTS: "/projects",
-    PROJECT_BY_INDEX: "/projects/:index",
+    PROJECT_BY_ID: "/projects/:id",
   },
   JOBS: {
     BASE: "/jobs",

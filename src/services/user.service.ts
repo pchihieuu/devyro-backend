@@ -13,6 +13,8 @@ import {
   UpdateProfileData,
   ExperienceItem,
   ProjectItem,
+  ProjectUpdateItem,
+  ExperienceUpdateItem,
 } from "../types/user.types";
 import {
   buildPaginatedResult,
@@ -80,8 +82,6 @@ export class UserService {
     if (data.availabilityStatus !== undefined)
       user.availabilityStatus = data.availabilityStatus;
     if (data.skills !== undefined) user.skills = data.skills;
-    if (data.experience !== undefined) user.experience = data.experience;
-    if (data.projects !== undefined) user.projects = data.projects;
 
     const saved = await userRepository.save(user);
 
@@ -198,7 +198,7 @@ export class UserService {
     if (!user) throw new NotFoundError("User not found");
 
     const experiences = user.experience || [];
-    experiences.push(experience);
+    experiences.push({ id: crypto.randomUUID(), ...experience });
     user.experience = experiences;
 
     return userRepository.save(user);
@@ -206,27 +206,39 @@ export class UserService {
 
   async updateExperience(
     userId: string,
-    index: number,
-    experience: ExperienceItem
+    experienceId: string,
+    experience: ExperienceUpdateItem
   ): Promise<User> {
     const user = await userRepository.findById(userId);
     if (!user) throw new NotFoundError("User not found");
-    if (!user.experience || index >= user.experience.length || index < 0) {
-      throw new BadRequestError("Invalid experience index");
+
+    const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
+    if (idx === -1) throw new NotFoundError("Experience not found");
+
+    // Merge với item cũ, chỉ field nào client gửi lên mới bị ghi đè
+    const merged = { ...user.experience[idx], ...experience, id: experienceId };
+
+    // Validate thứ tự ngày trên state SAU KHI MERGE, không phải trên payload gửi lên,
+    // vì payload có thể chỉ chứa 1 trong 2 field ngày.
+    if (merged.startDate && merged.endDate) {
+      const start = new Date(merged.startDate);
+      const end = new Date(merged.endDate);
+      if (end < start) {
+        throw new BadRequestError("End date must be after start date");
+      }
     }
 
-    user.experience[index] = experience;
+    user.experience[idx] = merged;
     return userRepository.save(user);
   }
 
-  async deleteExperience(userId: string, index: number): Promise<User> {
+  async deleteExperience(userId: string, experienceId: string): Promise<User> {
     const user = await userRepository.findById(userId);
     if (!user) throw new NotFoundError("User not found");
-    if (!user.experience || index >= user.experience.length || index < 0) {
-      throw new BadRequestError("Invalid experience index");
-    }
+    const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
+    if (idx === -1) throw new NotFoundError("Experience not found");
 
-    user.experience.splice(index, 1);
+    user.experience.splice(idx, 1);
     return userRepository.save(user);
   }
 
@@ -235,7 +247,7 @@ export class UserService {
     if (!user) throw new NotFoundError("User not found");
 
     const projects = user.projects || [];
-    projects.push(project);
+    projects.push({ id: crypto.randomUUID(), ...project });
     user.projects = projects;
 
     return userRepository.save(user);
@@ -243,33 +255,33 @@ export class UserService {
 
   async updateProject(
     userId: string,
-    index: number,
-    project: ProjectItem
+    projectId: string,
+    project: ProjectUpdateItem
   ): Promise<User> {
     const user = await userRepository.findById(userId);
     if (!user) throw new NotFoundError("User not found");
-    if (!user.projects || index >= user.projects.length || index < 0) {
-      throw new BadRequestError("Invalid project index");
-    }
 
-    const oldImage = user.projects[index].image;
-    const imageChanged = !!oldImage && project.image !== oldImage;
+    const index = (user.projects || []).findIndex((p) => p.id === projectId);
+    if (index === -1) throw new NotFoundError("Project not found");
 
-    user.projects[index] = project;
+    const oldItem = user.projects[index];
+    const oldImage = oldItem.image;
+    const merged = { ...oldItem, ...project, id: projectId };
+    const imageChanged = !!oldImage && merged.image !== oldImage;
+
+    user.projects[index] = merged;
     const saved = await userRepository.save(user);
 
-    // Xoá ảnh cũ sau khi save thành công (đồng nhất nguyên tắc với updateProfile)
     if (imageChanged) await this.deleteOldFile(oldImage, "image");
 
     return saved;
   }
 
-  async deleteProject(userId: string, index: number): Promise<User> {
+  async deleteProject(userId: string, projectId: string): Promise<User> {
     const user = await userRepository.findById(userId);
     if (!user) throw new NotFoundError("User not found");
-    if (!user.projects || index >= user.projects.length || index < 0) {
-      throw new BadRequestError("Invalid project index");
-    }
+    const index = (user.projects || []).findIndex((p) => p.id === projectId);
+    if (index === -1) throw new NotFoundError("Project not found");
 
     const oldImage = user.projects[index].image;
     user.projects.splice(index, 1);

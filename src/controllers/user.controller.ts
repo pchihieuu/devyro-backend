@@ -79,10 +79,10 @@ export const addExperience = asyncHandler(
 
 export const updateExperience = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { index } = req.validatedParams as { index: number };
+    const { id } = req.validatedParams as { id: string };
     const user = await userService.updateExperience(
       req.user!.id,
-      index,
+      id,
       req.body
     );
 
@@ -96,8 +96,8 @@ export const updateExperience = asyncHandler(
 
 export const deleteExperience = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { index } = req.validatedParams as { index: number };
-    const user = await userService.deleteExperience(req.user!.id, index);
+    const { id } = req.validatedParams as { id: string };
+    const user = await userService.deleteExperience(req.user!.id, id);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -121,8 +121,8 @@ export const addProject = asyncHandler(
 
 export const updateProject = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { index } = req.validatedParams as { index: number };
-    const user = await userService.updateProject(req.user!.id, index, req.body);
+    const { id } = req.validatedParams as { id: string };
+    const user = await userService.updateProject(req.user!.id, id, req.body);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -134,8 +134,8 @@ export const updateProject = asyncHandler(
 
 export const deleteProject = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { index } = req.validatedParams as { index: number };
-    const user = await userService.deleteProject(req.user!.id, index);
+    const { id } = req.validatedParams as { id: string };
+    const user = await userService.deleteProject(req.user!.id, id);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
