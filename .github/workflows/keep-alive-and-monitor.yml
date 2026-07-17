@@ -2,9 +2,9 @@ name: Keep Alive & Monitor
 
 on:
   schedule:
-    - cron: '0 3 */3 * *'   # ping Supabase mỗi 3 ngày lúc 3:00 UTC
-    - cron: '0 2 * * *'     # health-check Render mỗi ngày lúc 2:00 UTC
-  workflow_dispatch:        # cho phép chạy tay để test
+    - cron: "0 3 */3 * *" # ping Supabase mỗi 3 ngày lúc 3:00 UTC
+    - cron: "0 2 * * *" # health-check Render mỗi ngày lúc 2:00 UTC
+  workflow_dispatch: # cho phép chạy tay để test
 
 jobs:
   ping-supabase:
@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Query Supabase to reset inactivity timer
         run: |
-          curl -sf -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/your_table?select=id&limit=1" \
+          curl -sf -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/heartbeat?select=id&limit=1" \
           -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
           -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
 
