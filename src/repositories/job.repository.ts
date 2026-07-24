@@ -1,7 +1,7 @@
 import { AppDataSource } from "../config/database.config";
 import { Job, JobType, JobLevel } from "../entities/Job.entity";
-import { In, LessThanOrEqual, MoreThanOrEqual, ILike } from "typeorm";
-import { PaginationOptions } from "../utils/pagination.util";
+import { In, IsNull, LessThanOrEqual, MoreThanOrEqual, ILike } from "typeorm";
+import { PaginationOptions, getSkip } from "../utils/pagination.util";
 
 export interface JobFilters {
   keyword?: string;
@@ -18,8 +18,96 @@ const COMPANY_SUMMARY_SELECT = {
   id: true, name: true, logo: true, industry: true, size: true,
 } as const;
 
+const COMPANY_DETAIL_SELECT = {
+  id: true, name: true, logo: true, size: true, industry: true,
+  address: true, website: true, description: true, benefits: true, foundedYear: true,
+} as const;
+
 export class JobRepository {
   private repo = AppDataSource.getRepository(Job);
+
+  // ---- write ops ----
+
+  create(data: Partial<Job>): Job {
+    return this.repo.create(data);
+  }
+
+  async save(job: Job): Promise<Job> {
+    return this.repo.save(job);
+  }
+
+  async softDelete(jobId: string): Promise<void> {
+    await this.repo.softDelete(jobId);
+  }
+
+  // ---- single-record reads ----
+
+  async findById(jobId: string): Promise<Job | null> {
+    return this.repo.findOne({ where: { id: jobId } });
+  }
+
+  /** Dùng cho check ownership (update/delete/toggle) - chỉ cần company.employerId */
+  async findByIdWithCompany(jobId: string): Promise<Job | null> {
+    return this.repo.findOne({ where: { id: jobId }, relations: ["company"] });
+  }
+
+  /** Job còn active (chưa soft-delete) kèm company + employer - dùng khi apply/xem applicants */
+  async findActiveByIdWithCompany(jobId: string): Promise<Job | null> {
+    return this.repo.findOne({
+      where: { id: jobId, deletedAt: IsNull() },
+      relations: ["company", "company.employer"],
+    });
+  }
+
+  /** Dùng cho public detail page (getJobById) - company detail đầy đủ */
+  async findByIdWithCompanyDetail(jobId: string): Promise<Job | null> {
+    return this.repo.findOne({
+      where: { id: jobId },
+      relations: ["company", "company.employer"],
+      select: { company: COMPANY_DETAIL_SELECT },
+    });
+  }
+
+  // ---- list reads ----
+
+  async findAndCountByCompany(
+    companyId: string,
+    { page, limit, sortBy, order }: PaginationOptions
+  ): Promise<[Job[], number]> {
+    return this.repo.findAndCount({
+      where: { companyId },
+      relations: ["company"],
+      order: { [sortBy]: order },
+      skip: getSkip(page, limit),
+      take: limit,
+    });
+  }
+
+  /** Chỉ job đang mở - dùng ở public company profile page */
+  async findAndCountActiveByCompany(
+    companyId: string,
+    { page, limit, sortBy, order }: PaginationOptions
+  ): Promise<[Job[], number]> {
+    return this.repo.findAndCount({
+      where: { companyId, isClosed: false },
+      relations: ["company"],
+      order: { [sortBy]: order },
+      skip: getSkip(page, limit),
+      take: limit,
+    });
+  }
+
+  // ---- aggregates (dùng cho updateCompanyStats) ----
+
+  async countByCompany(companyId: string): Promise<number> {
+    return this.repo.count({ where: { companyId } });
+  }
+
+  async countActiveByCompany(companyId: string): Promise<number> {
+    return this.repo.count({ where: { companyId, isClosed: false } });
+  }
+
+  // ---- search (giữ nguyên logic QueryBuilder cho skill-matching) ----
 
   async search(filters: JobFilters, pagination: PaginationOptions): Promise<[Job[], number]> {
     const skillList = this.normalizeSkills(filters.skills);
@@ -67,7 +155,7 @@ export class JobRepository {
       relations: ["company", "company.employer"],
       select: { company: COMPANY_SUMMARY_SELECT },
       order: { [sortBy]: order },
-      skip: (page - 1) * limit,
+      skip: getSkip(page, limit),
       take: limit,
     });
   }
