@@ -2,28 +2,25 @@ import { Request, Response } from "express";
 import { notificationService } from "../services/notification.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS } from "../constants/httpStatus";
+import { buildPaginationMeta } from "../utils/pagination.util";
 
 export const getMyNotifications = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
+    const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
 
     const result = await notificationService.getMyNotifications(
       req.user!.id,
-      limit,
-      offset
+      page,
+      limit
     );
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: "Notifications retrieved successfully",
-      data: result.notifications,
-      meta: {
-        total: result.total,
-        unreadCount: result.unreadCount,
-        limit,
-        offset,
-      },
+      data: result.items,
+      pagination: buildPaginationMeta(result),
+      meta: { unreadCount: result.unreadCount },
     });
   }
 );
