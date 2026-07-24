@@ -1,40 +1,43 @@
-import { AppDataSource } from "../config/database.config";
 import { Company } from "../entities/Company.entity";
-import { Job } from "../entities/Job.entity";
-import { User, UserRole } from "../entities/User.entity";
+import { UserRole } from "../entities/User.entity";
 import { ForbiddenError, NotFoundError } from "../utils/errors";
-import { Like } from "typeorm";
-import { getSkip, buildPaginatedResult, PaginationOptions } from "../utils/pagination.util";
+import {
+  buildPaginatedResult,
+  PaginationOptions,
+} from "../utils/pagination.util";
 import { ensureRole, ensureOwnership } from "../utils/authorization.util";
-
-interface CompanyFilters {
-  keyword?: string;
-  industry?: string;
-  size?: string;
-}
-
-function buildCompanyWhere(filters: CompanyFilters) {
-  const where: any = {};
-  if (filters.keyword) where.name = Like(`%${filters.keyword}%`);
-  if (filters.industry) where.industry = filters.industry;
-  if (filters.size) where.size = filters.size;
-  return where;
-}
+import {
+  companyRepository,
+  CompanyRepository,
+  CompanyFilters,
+} from "../repositories/company.repository";
+import { jobRepository, JobRepository } from "../repositories/job.repository";
+import {
+  userRepository,
+  UserRepository,
+} from "../repositories/user.repository";
 
 export class CompanyService {
-  private companyRepository = AppDataSource.getRepository(Company);
-  private jobRepository = AppDataSource.getRepository(Job);
-  private userRepository = AppDataSource.getRepository(User);
+  constructor(
+    private readonly companyRepo: CompanyRepository = companyRepository,
+    private readonly jobRepo: JobRepository = jobRepository,
+    private readonly userRepo: UserRepository = userRepository
+  ) {}
 
-  async createCompany(employerId: string, companyData: Partial<Company>): Promise<Company> {
-    const user = await this.userRepository.findOne({ where: { id: employerId } });
+  async createCompany(
+    employerId: string,
+    companyData: Partial<Company>
+  ): Promise<Company> {
+    const user = await this.userRepo.findById(employerId);
     if (!user) throw new NotFoundError("User not found");
-    ensureRole(user.role, UserRole.EMPLOYER, "Only employers can create companies");
+    ensureRole(
+      user.role,
+      UserRole.EMPLOYER,
+      "Only employers can create companies"
+    );
 
-    const existingCompany = await this.companyRepository.findOne({
-      where: { employerId },
-      withDeleted: true,
-    });
+    const existingCompany =
+      await this.companyRepo.findByEmployerIdWithDeleted(employerId);
 
     if (existingCompany) {
       if (!existingCompany.deletedAt) {
@@ -43,82 +46,91 @@ export class CompanyService {
       return this.restoreCompany(existingCompany.id, companyData);
     }
 
-    const company = this.companyRepository.create({ ...companyData, employerId });
-    return this.companyRepository.save(company);
+    const company = this.companyRepo.create({ ...companyData, employerId });
+    return this.companyRepo.save(company);
   }
 
-  private async restoreCompany(companyId: string, companyData: Partial<Company>): Promise<Company> {
-    await this.companyRepository.restore(companyId);
-    const restored = await this.companyRepository.findOne({ where: { id: companyId } });
+  private async restoreCompany(
+    companyId: string,
+    companyData: Partial<Company>
+  ): Promise<Company> {
+    await this.companyRepo.restore(companyId);
+    const restored = await this.companyRepo.findById(companyId);
     if (!restored) throw new NotFoundError("Failed to restore company");
     Object.assign(restored, companyData);
-    return this.companyRepository.save(restored);
+    return this.companyRepo.save(restored);
   }
 
-  async getAllCompanies(filters: CompanyFilters, pagination: PaginationOptions) {
-    const { page, limit, sortBy, order } = pagination;
-    const [companies, total] = await this.companyRepository.findAndCount({
-      where: buildCompanyWhere(filters),
-      relations: ["employer"],
-      select: { employer: { id: true, name: true, email: true } },
-      order: { [sortBy]: order },
-      skip: getSkip(page, limit),
-      take: limit,
-    });
-    return buildPaginatedResult(companies, total, page, limit);
+  async getAllCompanies(
+    filters: CompanyFilters,
+    pagination: PaginationOptions
+  ) {
+    const [companies, total] = await this.companyRepo.findAndCount(
+      filters,
+      pagination
+    );
+    return buildPaginatedResult(
+      companies,
+      total,
+      pagination.page,
+      pagination.limit
+    );
   }
 
   async getCompanyById(companyId: string): Promise<Company> {
-    const company = await this.companyRepository.findOne({
-      where: { id: companyId },
-      relations: ["employer"],
-      select: { employer: { id: true, name: true, email: true, avatar: true } },
-    });
+    const company = await this.companyRepo.findByIdWithEmployer(companyId);
     if (!company) throw new NotFoundError("Company not found");
     return company;
   }
 
   async getCompanyByEmployerId(employerId: string): Promise<Company | null> {
-    return this.companyRepository.findOne({ where: { employerId } });
+    return this.companyRepo.findByEmployerId(employerId);
   }
 
   async getCompanyJobs(companyId: string, pagination: PaginationOptions) {
-    const { page, limit, sortBy, order } = pagination;
-
-    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findById(companyId);
     if (!company) throw new NotFoundError("Company not found");
 
-    const [jobs, total] = await this.jobRepository.findAndCount({
-      where: { companyId, isClosed: false },
-      relations: ["company"],
-      order: { [sortBy]: order },
-      skip: getSkip(page, limit),
-      take: limit,
-    });
-    return buildPaginatedResult(jobs, total, page, limit);
+    const [jobs, total] = await this.jobRepo.findAndCountActiveByCompany(
+      companyId,
+      pagination
+    );
+    return buildPaginatedResult(jobs, total, pagination.page, pagination.limit);
   }
 
-  async updateCompany(companyId: string, employerId: string, updates: Partial<Company>): Promise<Company> {
-    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+  async updateCompany(
+    companyId: string,
+    employerId: string,
+    updates: Partial<Company>
+  ): Promise<Company> {
+    const company = await this.companyRepo.findById(companyId);
     if (!company) throw new NotFoundError("Company not found");
-    ensureOwnership(company.employerId, employerId, "Not authorized to update this company");
+    ensureOwnership(
+      company.employerId,
+      employerId,
+      "Not authorized to update this company"
+    );
     Object.assign(company, updates);
-    return this.companyRepository.save(company);
+    return this.companyRepo.save(company);
   }
 
   async deleteCompany(companyId: string, employerId: string): Promise<void> {
-    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findById(companyId);
     if (!company) throw new NotFoundError("Company not found");
-    ensureOwnership(company.employerId, employerId, "Not authorized to delete this company");
-    await this.companyRepository.softDelete(companyId);
+    ensureOwnership(
+      company.employerId,
+      employerId,
+      "Not authorized to delete this company"
+    );
+    await this.companyRepo.softDelete(companyId);
   }
 
   async updateCompanyStats(companyId: string): Promise<void> {
     const [totalJobs, activeJobs] = await Promise.all([
-      this.jobRepository.count({ where: { companyId } }),
-      this.jobRepository.count({ where: { companyId, isClosed: false } }),
+      this.jobRepo.countByCompany(companyId),
+      this.jobRepo.countActiveByCompany(companyId),
     ]);
-    await this.companyRepository.update(companyId, { totalJobs, activeJobs });
+    await this.companyRepo.update(companyId, { totalJobs, activeJobs });
   }
 }
 

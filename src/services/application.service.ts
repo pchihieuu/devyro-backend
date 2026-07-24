@@ -1,30 +1,26 @@
-import { AppDataSource } from "../config/database.config";
 import { Application, ApplicationStatus } from "../entities/Application.entity";
 import { Job } from "../entities/Job.entity";
-import { Company } from "../entities/Company.entity";
 import {
   NotFoundError,
   ForbiddenError,
   ConflictError,
   BadRequestError,
 } from "../utils/errors";
-import { IsNull, Not } from "typeorm";
 import { notificationService } from "./notification.service";
 import { geminiAIMatchingService } from "./geminiaimatching.service";
 import { cleanResumeText, extractPDFText } from "../utils/pdfextractor.utils";
-
-interface PaginationOptions {
-  page: number;
-  limit: number;
-  sortBy: string;
-  order: "ASC" | "DESC";
-  status?: string;
-}
+import { jobRepository, JobRepository } from "../repositories/job.repository";
+import {
+  applicationRepository,
+  ApplicationRepository,
+  MyApplicationsQuery,
+} from "../repositories/application.repository";
 
 export class ApplicationService {
-  private applicationRepository = AppDataSource.getRepository(Application);
-  private jobRepository = AppDataSource.getRepository(Job);
-  private companyRepository = AppDataSource.getRepository(Company);
+  constructor(
+    private readonly applicationRepo: ApplicationRepository = applicationRepository,
+    private readonly jobRepo: JobRepository = jobRepository
+  ) {}
 
   /**
    * Apply to a job with AI matching analysis.
@@ -35,13 +31,7 @@ export class ApplicationService {
     applicantId: string,
     resumeUrl: string
   ): Promise<Application> {
-    const job = await this.jobRepository.findOne({
-      where: {
-        id: jobId,
-        deletedAt: IsNull(),
-      },
-      relations: ["company", "company.employer"],
-    });
+    const job = await this.jobRepo.findActiveByIdWithCompany(jobId);
 
     if (!job) {
       throw new NotFoundError("Job not found or has been removed");
@@ -55,9 +45,10 @@ export class ApplicationService {
       throw new BadRequestError("Resume is required to apply for this job");
     }
 
-    const existing = await this.applicationRepository.findOne({
-      where: { jobId, applicantId },
-    });
+    const existing = await this.applicationRepo.findByJobAndApplicant(
+      jobId,
+      applicantId
+    );
 
     let savedApplication: Application;
 
@@ -72,17 +63,16 @@ export class ApplicationService {
       existing.aiMatchingAnalysis = null;
       existing.aiAnalyzedAt = null;
 
-      savedApplication = await this.applicationRepository.save(existing);
+      savedApplication = await this.applicationRepo.save(existing);
     } else {
-      // Fresh application
-      const application = this.applicationRepository.create({
+      const application = this.applicationRepo.create({
         jobId,
         applicantId,
         resume: resumeUrl,
         status: ApplicationStatus.APPLIED,
       });
 
-      savedApplication = await this.applicationRepository.save(application);
+      savedApplication = await this.applicationRepo.save(application);
     }
 
     // Perform AI matching analysis asynchronously (don't block the response)
@@ -97,12 +87,10 @@ export class ApplicationService {
     );
 
     // Load applicant details for notification
-    const fullApplication = await this.applicationRepository.findOne({
-      where: { id: savedApplication.id },
-      relations: ["applicant"],
-    });
+    const fullApplication = await this.applicationRepo.findByIdWithApplicant(
+      savedApplication.id
+    );
 
-    // Send notification to employer
     if (job.company && job.company.employerId) {
       await notificationService.notifyEmployerNewApplication(
         job.company.employerId,
@@ -140,7 +128,7 @@ export class ApplicationService {
         job
       );
 
-      await this.applicationRepository.update(applicationId, {
+      await this.applicationRepo.update(applicationId, {
         aiMatchingScore: analysis.score,
         aiMatchingAnalysis: analysis,
         aiAnalyzedAt: new Date(),
@@ -157,7 +145,7 @@ export class ApplicationService {
       }
 
       // Silent fallback — only reached when called async from applyToJob
-      await this.applicationRepository.update(applicationId, {
+      await this.applicationRepo.update(applicationId, {
         aiMatchingScore: 0,
         aiMatchingAnalysis: {
           score: 0,
@@ -182,10 +170,8 @@ export class ApplicationService {
     applicationId: string,
     employerId: string
   ): Promise<{ message: string; analysis?: any }> {
-    const application = await this.applicationRepository.findOne({
-      where: { id: applicationId },
-      relations: ["job", "job.company"],
-    });
+    const application =
+      await this.applicationRepo.findByIdWithJobAndCompany(applicationId);
 
     if (!application) {
       throw new NotFoundError("Application not found");
@@ -206,10 +192,7 @@ export class ApplicationService {
       true
     );
 
-    const updated = await this.applicationRepository.findOne({
-      where: { id: applicationId },
-      select: ["aiMatchingScore", "aiMatchingAnalysis", "aiAnalyzedAt"],
-    });
+    const updated = await this.applicationRepo.findAiFieldsById(applicationId);
 
     return {
       message: "Gemini AI analysis completed successfully",
@@ -229,54 +212,24 @@ export class ApplicationService {
    */
   async getMyApplications(
     applicantId: string,
-    pagination: PaginationOptions
+    pagination: MyApplicationsQuery
   ): Promise<{
     applications: Application[];
     total: number;
     page: number;
     totalPages: number;
   }> {
-    const { page, limit, sortBy, order, status } = pagination;
-    const skip = (page - 1) * limit;
-
-    let where: any = { applicantId };
-
-    if (status) {
-      const enumValue = Object.values(ApplicationStatus).find(
-        (v) => v === status
-      );
-      if (enumValue) {
-        where.status = enumValue;
-      }
-    } else {
-      // Hide withdrawn applications from the default list view
-      where.status = Not(ApplicationStatus.WITHDRAWN);
-    }
-
     const [applications, total] =
-      await this.applicationRepository.findAndCount({
-        where,
-        relations: ["job", "job.company"],
-        select: {
-          job: {
-            id: true,
-            title: true,
-            location: true,
-            type: true,
-            companyId: true,
-            isClosed: true,
-          },
-        },
-        order: { [sortBy]: order },
-        skip,
-        take: limit,
-      });
+      await this.applicationRepo.findAndCountByApplicant(
+        applicantId,
+        pagination
+      );
 
     return {
       applications,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      page: pagination.page,
+      totalPages: Math.ceil(total / pagination.limit),
     };
   }
 
@@ -288,13 +241,7 @@ export class ApplicationService {
     jobId: string,
     employerId: string
   ): Promise<Application[]> {
-    const job = await this.jobRepository.findOne({
-      where: {
-        id: jobId,
-        deletedAt: IsNull(),
-      },
-      relations: ["company"],
-    });
+    const job = await this.jobRepo.findActiveByIdWithCompany(jobId);
 
     if (!job) {
       throw new NotFoundError("Job not found");
@@ -306,31 +253,7 @@ export class ApplicationService {
       );
     }
 
-    return await this.applicationRepository.find({
-      where: { jobId, status: Not(ApplicationStatus.WITHDRAWN) },
-      relations: ["job", "applicant"],
-      select: {
-        job: {
-          id: true,
-          title: true,
-          location: true,
-          category: true,
-          type: true,
-          isClosed: true,
-        },
-        applicant: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          resume: true,
-        },
-      },
-      order: {
-        aiMatchingScore: "DESC",
-        createdAt: "DESC",
-      },
-    });
+    return this.applicationRepo.findByJobExcludingWithdrawn(jobId);
   }
 
   /**
@@ -341,29 +264,8 @@ export class ApplicationService {
     applicationId: string,
     userId: string
   ): Promise<Application> {
-    const application = await this.applicationRepository.findOne({
-      where: { id: applicationId },
-      relations: ["job", "job.company", "applicant"],
-      select: {
-        job: {
-          id: true,
-          title: true,
-          companyId: true,
-          isClosed: true,
-          location: true,
-          type: true,
-          salaryMin: true,
-          salaryMax: true,
-        },
-        applicant: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          resume: true,
-        },
-      },
-    });
+    const application =
+      await this.applicationRepo.findByIdWithJobAndApplicant(applicationId);
 
     if (!application) {
       throw new NotFoundError("Application not found");
@@ -388,10 +290,8 @@ export class ApplicationService {
     employerId: string,
     status: ApplicationStatus
   ): Promise<{ message: string; status: ApplicationStatus }> {
-    const application = await this.applicationRepository.findOne({
-      where: { id: applicationId },
-      relations: ["job", "job.company"],
-    });
+    const application =
+      await this.applicationRepo.findByIdWithJobAndCompany(applicationId);
 
     if (!application) {
       throw new NotFoundError("Application not found");
@@ -415,7 +315,7 @@ export class ApplicationService {
 
     const oldStatus = application.status;
     application.status = status;
-    await this.applicationRepository.save(application);
+    await this.applicationRepo.save(application);
 
     if (oldStatus !== status) {
       await notificationService.notifyApplicationStatusChanged(
@@ -439,12 +339,10 @@ export class ApplicationService {
     applicationId: string,
     applicantId: string
   ): Promise<{ message: string }> {
-    const application = await this.applicationRepository.findOne({
-      where: {
-        id: applicationId,
-        applicantId,
-      },
-    });
+    const application = await this.applicationRepo.findByIdAndApplicant(
+      applicationId,
+      applicantId
+    );
 
     if (!application) {
       throw new NotFoundError("Application not found");
@@ -460,11 +358,9 @@ export class ApplicationService {
     }
 
     application.status = ApplicationStatus.WITHDRAWN;
-    await this.applicationRepository.save(application);
+    await this.applicationRepo.save(application);
 
-    return {
-      message: "Application withdrawn successfully",
-    };
+    return { message: "Application withdrawn successfully" };
   }
 }
 
