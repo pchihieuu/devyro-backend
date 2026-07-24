@@ -8,7 +8,10 @@ import {
   ForbiddenError,
   BadRequestError,
 } from "../utils/errors";
-import { userRepository } from "../repositories/user.repository";
+import {
+  userRepository,
+  UserRepository,
+} from "../repositories/user.repository";
 import {
   UpdateProfileData,
   ExperienceItem,
@@ -23,11 +26,13 @@ import {
 } from "../utils/pagination.util";
 
 export class UserService {
+  constructor(private readonly userRepo: UserRepository = userRepository) {}
+
   async updateProfile(
     userId: string,
     data: UpdateProfileData
   ): Promise<Partial<User>> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     // Check quyền trước khi mutate bất cứ gì
@@ -83,7 +88,7 @@ export class UserService {
       user.availabilityStatus = data.availabilityStatus;
     if (data.skills !== undefined) user.skills = data.skills;
 
-    const saved = await userRepository.save(user);
+    const saved = await this.userRepo.save(user);
 
     // Chỉ xoá file cũ SAU KHI save DB chắc chắn thành công
     if (avatarChanged) await this.deleteOldFile(oldAvatar, "image");
@@ -93,7 +98,7 @@ export class UserService {
   }
 
   async deleteResume(userId: string): Promise<void> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
     if (user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can delete resume");
@@ -102,14 +107,14 @@ export class UserService {
 
     const oldResume = user.resume;
     user.resume = null;
-    await userRepository.save(user);
+    await this.userRepo.save(user);
 
     // Xoá file sau khi save DB thành công, cùng nguyên tắc với updateProfile
     await this.deleteOldFile(oldResume, "raw");
   }
 
   async getPublicProfile(userId: string): Promise<Partial<User>> {
-    const user = await userRepository.findByIdWithCompany(userId);
+    const user = await this.userRepo.findByIdWithCompany(userId);
     if (!user) throw new NotFoundError("User not found");
 
     return {
@@ -140,7 +145,7 @@ export class UserService {
   }
 
   async getMyProfile(userId: string): Promise<Partial<User>> {
-    const user = await userRepository.findByIdSelectProfile(userId);
+    const user = await this.userRepo.findByIdSelectProfile(userId);
     if (!user) throw new NotFoundError("User not found");
     return user;
   }
@@ -181,7 +186,7 @@ export class UserService {
     limit: number = 20
   ): Promise<PaginatedResult<Partial<User>>> {
     const skip = getSkip(page, limit);
-    const [users, total] = await userRepository.searchUsers(
+    const [users, total] = await this.userRepo.searchUsers(
       query,
       currentUserId,
       skip,
@@ -194,14 +199,14 @@ export class UserService {
     userId: string,
     experience: ExperienceItem
   ): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     const experiences = user.experience || [];
     experiences.push({ id: crypto.randomUUID(), ...experience });
     user.experience = experiences;
 
-    return userRepository.save(user);
+    return this.userRepo.save(user);
   }
 
   async updateExperience(
@@ -209,7 +214,7 @@ export class UserService {
     experienceId: string,
     experience: ExperienceUpdateItem
   ): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
@@ -229,28 +234,28 @@ export class UserService {
     }
 
     user.experience[idx] = merged;
-    return userRepository.save(user);
+    return this.userRepo.save(user);
   }
 
   async deleteExperience(userId: string, experienceId: string): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
     const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
     if (idx === -1) throw new NotFoundError("Experience not found");
 
     user.experience.splice(idx, 1);
-    return userRepository.save(user);
+    return this.userRepo.save(user);
   }
 
   async addProject(userId: string, project: ProjectItem): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     const projects = user.projects || [];
     projects.push({ id: crypto.randomUUID(), ...project });
     user.projects = projects;
 
-    return userRepository.save(user);
+    return this.userRepo.save(user);
   }
 
   async updateProject(
@@ -258,7 +263,7 @@ export class UserService {
     projectId: string,
     project: ProjectUpdateItem
   ): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     const index = (user.projects || []).findIndex((p) => p.id === projectId);
@@ -270,7 +275,7 @@ export class UserService {
     const imageChanged = !!oldImage && merged.image !== oldImage;
 
     user.projects[index] = merged;
-    const saved = await userRepository.save(user);
+    const saved = await this.userRepo.save(user);
 
     if (imageChanged) await this.deleteOldFile(oldImage, "image");
 
@@ -278,14 +283,14 @@ export class UserService {
   }
 
   async deleteProject(userId: string, projectId: string): Promise<User> {
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
     const index = (user.projects || []).findIndex((p) => p.id === projectId);
     if (index === -1) throw new NotFoundError("Project not found");
 
     const oldImage = user.projects[index].image;
     user.projects.splice(index, 1);
-    const saved = await userRepository.save(user);
+    const saved = await this.userRepo.save(user);
 
     if (oldImage) await this.deleteOldFile(oldImage, "image");
 
@@ -309,11 +314,11 @@ export class UserService {
   }
 
   async updateAvatar(userId: string, newAvatarUrl: string): Promise<void> {
-    const user = await userRepository.findByIdSelect(userId, ["id", "avatar"]);
+    const user = await this.userRepo.findByIdSelect(userId, ["id", "avatar"]);
     if (!user) throw new NotFoundError("User not found");
 
     const oldAvatar = user.avatar;
-    await userRepository.updateFields(userId, { avatar: newAvatarUrl });
+    await this.userRepo.updateFields(userId, { avatar: newAvatarUrl });
 
     if (oldAvatar && oldAvatar !== newAvatarUrl) {
       await this.deleteOldFile(oldAvatar, "image");
@@ -321,7 +326,7 @@ export class UserService {
   }
 
   async updateResume(userId: string, newResumeUrl: string): Promise<void> {
-    const user = await userRepository.findByIdSelect(userId, [
+    const user = await this.userRepo.findByIdSelect(userId, [
       "id",
       "resume",
       "role",
@@ -333,7 +338,7 @@ export class UserService {
     }
 
     const oldResume = user.resume;
-    await userRepository.updateFields(userId, { resume: newResumeUrl });
+    await this.userRepo.updateFields(userId, { resume: newResumeUrl });
 
     if (oldResume && oldResume !== newResumeUrl) {
       await this.deleteOldFile(oldResume, "raw");
