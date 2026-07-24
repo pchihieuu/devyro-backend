@@ -1,7 +1,7 @@
 // validation.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema, ZodError, ZodIssue } from "zod";
-import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { ValidationError, FieldError } from "../utils/errors";
 
 interface ValidateData {
   body?: any;
@@ -19,35 +19,32 @@ export const validate =
         params: req.params,
       })) as ValidateData;
 
-      // req.body vẫn là property ghi được bình thường ở cả Express 4 và 5
       if (validated.body !== undefined) {
         req.body = validated.body;
       }
 
-      // req.query là getter-only từ Express 5 -> KHÔNG được gán lại.
-      // Lưu kết quả đã validate/transform vào property riêng, tách khỏi req.query gốc.
       req.validatedQuery = validated.query;
       req.validatedParams = validated.params;
 
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.issues.map((err: ZodIssue) => ({
-          field: err.path.join("."),
+        const errors: FieldError[] = error.issues.map((err: ZodIssue) => ({
+          // Bỏ prefix "body."/"query."/"params." — chỉ giữ tên field thật
+          // (vd "hourlyRateMax" thay vì "body.hourlyRateMax") để khớp với
+          // tên field trên form FE, tránh nhầm lẫn khi hiển thị/mapping lỗi.
+          field:
+            err.path.length > 1 ? err.path.slice(1).join(".") : null,
           message: err.message,
         }));
 
-        res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({
-          success: false,
-          message: HTTP_MESSAGE.VALIDATION_ERROR,
-          errors,
-        });
+        // KHÔNG tự res.json() nữa — next(err) để đi qua CHUNG 1 errorHandler.middleware.ts
+        // với mọi lỗi khác (BadRequestError từ service, v.v.), đảm bảo response
+        // shape luôn giống nhau: { success, message, errors: [{field, message}] }
+        next(new ValidationError(errors));
         return;
       }
 
-      res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: HTTP_MESSAGE.VALIDATION_ERROR,
-      });
+      next(error);
     }
   };

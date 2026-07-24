@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { AppError } from "../utils/errors";
+import { AppError, FieldError } from "../utils/errors";
 import { HTTP_STATUS } from "../constants/httpStatus";
 import { logger } from "../utils/logger";
 
@@ -12,11 +12,13 @@ export const errorHandler = (
   let statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR;
   let message = "Internal server error";
   let isOperational = false;
+  let errors: FieldError[] = [{ field: null, message }];
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
     isOperational = err.isOperational;
+    errors = err.errors;
   } else if (
     err.name === "QueryFailedError" ||
     err.name === "EntityNotFoundError"
@@ -24,6 +26,7 @@ export const errorHandler = (
     statusCode = HTTP_STATUS.BAD_REQUEST;
     message = "A database error occurred. Please try again.";
     isOperational = false;
+    errors = [{ field: null, message }];
   } else if (
     err.name === "JsonWebTokenError" ||
     err.name === "TokenExpiredError"
@@ -31,14 +34,19 @@ export const errorHandler = (
     statusCode = HTTP_STATUS.UNAUTHORIZED ?? 401;
     message = "Invalid or expired authentication token.";
     isOperational = true;
+    errors = [{ field: null, message }];
   } else if (err.name === "MulterError") {
     statusCode = HTTP_STATUS.BAD_REQUEST;
     message = err.message;
     isOperational = true;
+    errors = [{ field: null, message }];
   } else if (err.message?.startsWith("CORS blocked:")) {
     statusCode = 403;
     message = "Request blocked by CORS policy.";
     isOperational = true;
+    errors = [{ field: null, message }];
+  } else {
+    errors = [{ field: null, message }];
   }
 
   if (!isOperational || statusCode >= 500) {
@@ -68,6 +76,7 @@ export const errorHandler = (
   res.status(statusCode).json({
     success: false,
     message,
+    errors,
     ...(isDev && { stack: err.stack }),
   });
 };
@@ -80,5 +89,6 @@ export const notFoundHandler = (
   res.status(HTTP_STATUS.NOT_FOUND).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,
+    errors: [{ field: null, message: `Route ${req.originalUrl} not found` }],
   });
 };

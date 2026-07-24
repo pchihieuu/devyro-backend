@@ -1,21 +1,27 @@
 import { HTTP_STATUS } from "../constants/httpStatus";
 
+export interface FieldError {
+  field: string | null;
+  message: string;
+}
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
+  errors: FieldError[];
 
-  constructor(message: string, statusCode: number) {
+  constructor(message: string, statusCode: number, errors?: FieldError[]) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = true;
+    this.errors = errors ?? [{ field: null, message }];
 
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 export class BadRequestError extends AppError {
-  constructor(message: string = "Bad Request") {
-    super(message, HTTP_STATUS.BAD_REQUEST);
+  constructor(message: string = "Bad Request", errors?: FieldError[]) {
+    super(message, HTTP_STATUS.BAD_REQUEST, errors);
   }
 }
 
@@ -46,7 +52,7 @@ export class ConflictError extends AppError {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string = "Validation failed") {
-    super(message, HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  constructor(errors: FieldError[], message: string = "Validation failed") {
+    super(message, HTTP_STATUS.UNPROCESSABLE_ENTITY, errors);
   }
 }
