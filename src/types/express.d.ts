@@ -11,6 +11,24 @@ declare global {
   }
 }
 
+/**
+ * Request đã "biết" type cụ thể sau khi qua middleware validate().
+ * Dùng làm generic cho asyncHandler<ValidatedRequest<...>> ở controller,
+ * thay cho việc cast `as {...}` thủ công lặp lại ở từng nơi.
+ *
+ * TParams/TQuery nên lấy trực tiếp từ z.infer<typeof schema> trong validator
+ * tương ứng, để type luôn bám theo schema thật (sửa schema -> type tự cập nhật).
+ */
+
+export type ValidatedRequest<
+  TParams = Record<string, any>,
+  TQuery = Record<string, any>,
+  TBody = any,
+> = Request<any, any, TBody, any> & {
+  validatedParams: TParams;
+  validatedQuery: TQuery;
+};
+
 export interface JwtPayload {
   id: string;
 }

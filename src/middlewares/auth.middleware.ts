@@ -67,3 +67,46 @@ export const protect = async (
     });
   }
 };
+
+
+export const optionalAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const token = req.headers.authorization;
+
+  // Không có token / sai format -> coi như khách vãng lai, cho qua luôn
+  if (!token || !token.startsWith("Bearer")) {
+    return next();
+  }
+
+  try {
+    const accessToken = token.split(" ")[1];
+    const decoded = verifyAccessToken(accessToken);
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: decoded.id },
+      select: [
+        "id",
+        "name",
+        "email",
+        "role",
+        "avatar",
+        "resume",
+        "createdAt",
+        "updatedAt",
+      ],
+    });
+
+    if (user) {
+      req.user = user;
+    }
+  } catch {
+    // Token hết hạn / sai / bị chỉnh sửa -> im lặng bỏ qua, không throw 401
+    // Khác với `protect`: lỗi token ở đây không được phép chặn user xem trang public
+  }
+
+  next();
+};
