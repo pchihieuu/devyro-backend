@@ -165,4 +165,4 @@ export const getJobsSchema = z.object({
     "createdAt"
   ).merge(jobFilterFields),
 });
-export type GetJobsQuery = z.infer<typeof getJobsSchema>["query"]; // ✅ thêm
+export type GetJobsQuery = z.infer<typeof getJobsSchema>["query"];
