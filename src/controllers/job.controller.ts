@@ -1,13 +1,23 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { jobService } from "../services/job.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ForbiddenError, NotFoundError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
-import { JobFilterQuery } from "../types/express";
+import { buildPaginationMeta } from "../utils/pagination.util";
+import { ValidatedRequest } from "../types/express";
+import {
+  JobIdParams,
+  GetJobByIdParams,
+  UpdateJobParams,
+  UpdateJobBody,
+  GetJobsQuery,
+  EmployerJobsQuery,
+} from "../validators/job.validator";
+import { PaginationOptions } from "../utils/pagination.util";
 
 export const createJob = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: ValidatedRequest, res: Response): Promise<void> => {
     if (req.user!.role !== UserRole.EMPLOYER) {
       throw new ForbiddenError("Only employers can post jobs");
     }
@@ -33,105 +43,75 @@ export const createJob = asyncHandler(
   }
 );
 
-export const getJobs = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const {
-      keyword,
-      location,
-      category,
-      type,
-      level,
-      minSalary,
-      maxSalary,
-      skills,
-      userId,
-      page = "1",
-      limit = "12",
-      sortBy = "createdAt",
-      order = "desc",
-    } = req.query as JobFilterQuery & { skills?: string | string[] };
+export const getJobs = asyncHandler<
+  ValidatedRequest<Record<string, never>, GetJobsQuery>
+>(async (req, res): Promise<void> => {
+  const {
+    keyword,
+    location,
+    category,
+    type,
+    level,
+    minSalary,
+    maxSalary,
+    skills,
+    page,
+    limit,
+    sortBy,
+    order,
+  } = req.validatedQuery;
 
-    const filters = {
-      keyword,
-      location,
-      category,
-      type,
-      level,
-      minSalary,
-      maxSalary,
-      skills,
-      userId,
-    };
+  const filters = {
+    keyword,
+    location,
+    category,
+    type,
+    level,
+    minSalary,
+    maxSalary,
+    skills,
+    userId: req.user?.id,
+  };
+  const pagination: PaginationOptions = { page, limit, sortBy, order };
 
-    const pagination = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sortBy,
-      order: order.toUpperCase() as "ASC" | "DESC",
-    };
+  const result = await jobService.getJobs(filters, pagination);
 
-    const result = await jobService.getJobs(filters, pagination);
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result.items,
+    pagination: { ...buildPaginationMeta(result), limit: pagination.limit },
+  });
+});
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result.items,
-      pagination: {
-        currentPage: result.page,
-        totalPages: result.totalPages,
-        total: result.total,
-        limit: pagination.limit,
-        hasNextPage: result.page < result.totalPages,
-        hasPrevPage: result.page > 1,
-      },
-    });
+export const getJobsEmployer = asyncHandler<
+  ValidatedRequest<Record<string, never>, EmployerJobsQuery>
+>(async (req, res): Promise<void> => {
+  if (req.user!.role !== UserRole.EMPLOYER) {
+    throw new ForbiddenError("Access denied");
   }
-);
 
-export const getJobsEmployer = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    if (req.user!.role !== UserRole.EMPLOYER) {
-      throw new ForbiddenError("Access denied");
-    }
+  const { page, limit, sortBy, order } = req.validatedQuery;
 
-    const {
-      page = "1",
-      limit = "6",
-      sortBy = "createdAt",
-      order = "desc",
-    } = req.query;
-    const orderRaw = typeof order === "string" ? order : "desc";
+  const result = await jobService.getJobsEmployer(req.user!.id, {
+    page,
+    limit,
+    sortBy,
+    order,
+  });
 
-    const pagination = {
-      page: Number(page),
-      limit: Number(limit),
-      sortBy: sortBy as string,
-      order: orderRaw.toUpperCase() as "ASC" | "DESC",
-    };
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result.items,
+    pagination: { ...buildPaginationMeta(result), limit },
+  });
+});
 
-    const result = await jobService.getJobsEmployer(req.user!.id, pagination);
+export const getJobById = asyncHandler<ValidatedRequest<GetJobByIdParams>>(
+  async (req, res): Promise<void> => {
+    const { id } = req.validatedParams;
+    const userId = req.user?.id;
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result.items,
-      pagination: {
-        currentPage: result.page,
-        totalPages: result.totalPages,
-        total: result.total,
-        limit: pagination.limit,
-        hasNextPage: result.page < result.totalPages,
-        hasPrevPage: result.page > 1,
-      },
-    });
-  }
-);
-
-export const getJobById = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const { userId } = req.query;
-    const job = await jobService.getJobById(
-      req.params.id,
-      userId as string | undefined
-    );
+    const job = await jobService.getJobById(id, userId);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -140,25 +120,23 @@ export const getJobById = asyncHandler(
   }
 );
 
-export const updateJob = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const job = await jobService.updateJob(
-      req.params.id,
-      req.user!.id,
-      req.body
-    );
+export const updateJob = asyncHandler<
+  ValidatedRequest<UpdateJobParams, Record<string, never>, UpdateJobBody>
+>(async (req, res): Promise<void> => {
+  const { id } = req.validatedParams;
+  const job = await jobService.updateJob(id, req.user!.id, req.body);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.UPDATED,
-      data: job,
-    });
-  }
-);
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: HTTP_MESSAGE.UPDATED,
+    data: job,
+  });
+});
 
-export const deleteJob = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    await jobService.deleteJob(req.params.id, req.user!.id);
+export const deleteJob = asyncHandler<ValidatedRequest<JobIdParams>>(
+  async (req, res): Promise<void> => {
+    const { id } = req.validatedParams;
+    await jobService.deleteJob(id, req.user!.id);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -167,12 +145,10 @@ export const deleteJob = asyncHandler(
   }
 );
 
-export const toggleCloseJob = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const result = await jobService.toggleJobStatus(
-      req.params.id,
-      req.user!.id
-    );
+export const toggleCloseJob = asyncHandler<ValidatedRequest<JobIdParams>>(
+  async (req, res): Promise<void> => {
+    const { id } = req.validatedParams;
+    const result = await jobService.toggleJobStatus(id, req.user!.id);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
