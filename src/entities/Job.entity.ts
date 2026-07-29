@@ -80,7 +80,7 @@ export class Job {
   @Index()
   salaryMax: number;
 
-  @Column({ type: "simple-array", nullable: true, default: null })
+  @Column({ type: "text", array: true, nullable: true, default: null })
   skills: string[];
 
   @Column({ type: "boolean", default: false })

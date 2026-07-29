@@ -7,6 +7,7 @@ import { savedJobRepository, SavedJobRepository } from "../repositories/savedJob
 import { applicationRepository, ApplicationRepository } from "../repositories/application.repository";
 import { companyRepository, CompanyRepository } from "../repositories/company.repository";
 import { companyService } from "./company.service";
+import { JobWithExtras } from "../types/job.types";
 
 export class JobService {
   constructor(
@@ -33,13 +34,13 @@ export class JobService {
   async getJobs(filters: JobFilters & { userId?: string }, pagination: PaginationOptions) {
     const [jobs, total] = await this.jobRepo.search(filters, pagination);
 
-    let jobsWithExtras: any[] = jobs;
+    let jobsWithExtras: Job[] | JobWithExtras[]= jobs
     if (filters.userId) {
       const [savedJobIds, statusMap] = await Promise.all([
         this.savedJobRepo.findJobIdsByJobseeker(filters.userId),
         this.applicationRepo.findStatusMapByApplicant(filters.userId),
       ]);
-      jobsWithExtras = jobs.map((job) => ({
+      jobsWithExtras = jobs.map((job): JobWithExtras => ({
         ...job,
         isSaved: savedJobIds.includes(job.id),
         applicationStatus: statusMap[job.id] || null,

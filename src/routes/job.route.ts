@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protect } from "../middlewares/auth.middleware";
+import { optionalAuth, protect } from "../middlewares/auth.middleware";
 import {
   createJob,
   getJobs,
@@ -39,11 +39,11 @@ router.patch(
 router
   .route("/")
   .post(protect, validate(createJobSchema), createJob)
-  .get(validate(getJobsSchema), getJobs);
+  .get(optionalAuth, validate(getJobsSchema), getJobs);
 
 router
   .route(ROUTES.JOBS.BY_ID)
-  .get(validate(getJobByIdSchema), getJobById)
+  .get(optionalAuth, validate(getJobByIdSchema), getJobById)
   .put(protect, validate(updateJobSchema), updateJob)
   .delete(protect, validate(jobIdParamSchema), deleteJob);
 
