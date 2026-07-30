@@ -163,6 +163,19 @@ export const getJobsSchema = z.object({
   query: createPaginationSchema(
     ["createdAt", "title", "salaryMin", "salaryMax"] as const,
     "createdAt"
-  ).merge(jobFilterFields),
+  )
+    .merge(jobFilterFields)
+    .refine(
+      (data) => {
+        if (data.minSalary && data.maxSalary) {
+          return data.maxSalary >= data.minSalary;
+        }
+        return true;
+      },
+      {
+        message: "maxSalary must be greater than or equal to minSalary",
+        path: ["maxSalary"],
+      }
+    ),
 });
 export type GetJobsQuery = z.infer<typeof getJobsSchema>["query"];
