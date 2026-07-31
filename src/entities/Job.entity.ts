@@ -35,6 +35,7 @@ export enum JobLevel {
 
 @Entity("jobs")
 @Index(["title", "location", "category"])
+@Index("IDX_jobs_skills_gin", { synchronize: false })
 export class Job {
   @PrimaryGeneratedColumn("uuid")
   id: string;
