@@ -16,6 +16,7 @@ import {
   userRepository,
   UserRepository,
 } from "../repositories/user.repository";
+import { CompanyDetail } from "../types/company.types";
 
 export class CompanyService {
   constructor(
@@ -77,7 +78,7 @@ export class CompanyService {
     );
   }
 
-  async getCompanyById(companyId: string): Promise<Company> {
+  async getCompanyById(companyId: string): Promise<CompanyDetail> {
     const company = await this.companyRepo.findByIdWithEmployer(companyId);
     if (!company) throw new NotFoundError("Company not found");
     return company;
