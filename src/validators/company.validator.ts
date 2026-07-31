@@ -1,14 +1,18 @@
 import { z } from "zod";
 import { createPaginationSchema } from "./common.validator";
 
-
 export const getAllCompaniesSchema = z.object({
-  query: z.object({
-    keyword: z.string().optional(),
-    industry: z.string().optional(),
-    size: z.string().optional(),
-  }).merge(createPaginationSchema(["createdAt", "name"] as const)),
+  query: z
+    .object({
+      keyword: z.string().optional(),
+      industry: z.string().optional(),
+      size: z.string().optional(),
+    })
+    .merge(createPaginationSchema(["createdAt", "name"] as const)),
 });
+export type GetAllCompaniesQuery = z.infer<
+  typeof getAllCompaniesSchema
+>["query"];
 
 export const createCompanySchema = z.object({
   body: z.object({
@@ -46,6 +50,7 @@ export const createCompanySchema = z.object({
     benefits: z.array(z.string()).optional(),
   }),
 });
+export type CreateCompanyBody = z.infer<typeof createCompanySchema>["body"];
 
 export const updateCompanySchema = z.object({
   params: z.object({
@@ -95,36 +100,33 @@ export const updateCompanySchema = z.object({
       message: "At least one field must be provided for update",
     }),
 });
+export type UpdateCompanyParams = z.infer<typeof updateCompanySchema>["params"];
+export type UpdateCompanyBody = z.infer<typeof updateCompanySchema>["body"];
 
 export const getCompanyByIdSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid company ID format"),
   }),
 });
+export type GetCompanyByIdParams = z.infer<
+  typeof getCompanyByIdSchema
+>["params"];
 
+// Trước đây tự định nghĩa page/limit/sortBy/order riêng (order: "asc"/"desc" thường),
+// lệch với createPaginationSchema (order: "ASC"/"DESC" khớp PaginationOptions) khiến
+// controller phải tự .toUpperCase(). Giờ dùng chung factory như getAllCompaniesSchema.
 export const getCompanyJobsSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid company ID format"),
   }),
-  query: z
-    .object({
-      page: z
-        .string()
-        .transform((val) => parseInt(val, 10))
-        .refine((val) => val >= 1, "Page must be at least 1")
-        .optional(),
-      limit: z
-        .string()
-        .transform((val) => parseInt(val, 10))
-        .refine(
-          (val) => val >= 1 && val <= 100,
-          "Limit must be between 1 and 100"
-        )
-        .optional(),
-      sortBy: z
-        .enum(["createdAt", "title", "salaryMin", "salaryMax"])
-        .optional(),
-      order: z.enum(["asc", "desc"]).optional(),
-    })
-    .optional(),
+  query: createPaginationSchema([
+    "createdAt",
+    "title",
+    "salaryMin",
+    "salaryMax",
+  ] as const),
 });
+export type GetCompanyJobsParams = z.infer<
+  typeof getCompanyJobsSchema
+>["params"];
+export type GetCompanyJobsQuery = z.infer<typeof getCompanyJobsSchema>["query"];

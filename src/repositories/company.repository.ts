@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/database.config";
 import { Company } from "../entities/Company.entity";
 import { Like } from "typeorm";
 import { PaginationOptions, getSkip } from "../utils/pagination.util";
+import { CompanyDetail, CompanySummary } from "../types/company.types";
 
 export interface CompanyFilters {
   keyword?: string;
@@ -56,12 +57,12 @@ export class CompanyRepository {
     return this.repo.findOne({ where: { id } });
   }
 
-  async findByIdWithEmployer(id: string): Promise<Company | null> {
+  async findByIdWithEmployer(id: string): Promise<CompanyDetail | null> {
     return this.repo.findOne({
       where: { id },
       relations: ["employer"],
       select: { employer: EMPLOYER_DETAIL_SELECT },
-    });
+    }) as Promise<CompanyDetail | null>;
   }
 
   async findByEmployerId(employerId: string): Promise<Company | null> {
@@ -79,8 +80,8 @@ export class CompanyRepository {
   async findAndCount(
     filters: CompanyFilters,
     { page, limit, sortBy, order }: PaginationOptions
-  ): Promise<[Company[], number]> {
-    return this.repo.findAndCount({
+  ): Promise<[CompanySummary[], number]> {
+    const [item, total] = await this.repo.findAndCount({
       where: buildCompanyWhere(filters),
       relations: ["employer"],
       select: { employer: EMPLOYER_SUMMARY_SELECT },
@@ -88,6 +89,7 @@ export class CompanyRepository {
       skip: getSkip(page, limit),
       take: limit,
     });
+    return [item as CompanySummary[], total];
   }
 }
 

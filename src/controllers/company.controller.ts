@@ -1,173 +1,137 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { companyService } from "../services/company.service";
 import { uploadService } from "../services/upload.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
 import { ForbiddenError, BadRequestError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
+import { buildPaginationMeta } from "../utils/pagination.util";
 import {
-  buildPaginationMeta,
-  PaginationOptions,
-} from "../utils/pagination.util";
+  GetAllCompaniesQuery,
+  CreateCompanyBody,
+  UpdateCompanyParams,
+  UpdateCompanyBody,
+  GetCompanyByIdParams,
+  GetCompanyJobsParams,
+  GetCompanyJobsQuery,
+} from "../validators/company.validator";
+import { ValidatedRequest } from "../types/express";
 
-interface CompanyFilterQuery {
-  keyword?: string;
-  industry?: string;
-  size?: string;
-  page?: string;
-  limit?: string;
-  sortBy?: string;
-  order?: string;
-}
-
-export const createCompany = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    if (req.user!.role !== UserRole.EMPLOYER) {
-      throw new ForbiddenError("Only employers can create companies");
-    }
-
-    const company = await companyService.createCompany(req.user!.id, req.body);
-
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: HTTP_MESSAGE.CREATED,
-      data: company,
-    });
+export const createCompany = asyncHandler<
+  ValidatedRequest<
+    Record<string, never>,
+    Record<string, never>,
+    CreateCompanyBody
+  >
+>(async (req, res: Response): Promise<void> => {
+  if (req.user!.role !== UserRole.EMPLOYER) {
+    throw new ForbiddenError("Only employers can create companies");
   }
-);
+  const company = await companyService.createCompany(req.user!.id, req.body);
+  res.status(HTTP_STATUS.CREATED).json({
+    success: true,
+    message: HTTP_MESSAGE.CREATED,
+    data: company,
+  });
+});
 
-export const getAllCompanies = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const { keyword, industry, size, page, limit, sortBy, order } =
-      req.query as unknown as CompanyFilterQuery & PaginationOptions;
+export const getAllCompanies = asyncHandler<
+  ValidatedRequest<Record<string, never>, GetAllCompaniesQuery>
+>(async (req, res: Response): Promise<void> => {
+  const { keyword, industry, size, page, limit, sortBy, order } =
+    req.validatedQuery;
 
-    const result = await companyService.getAllCompanies(
-      { keyword, industry, size },
-      { page, limit, sortBy, order }
-    );
+  const result = await companyService.getAllCompanies(
+    { keyword, industry, size },
+    { page, limit, sortBy, order }
+  );
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result.items,
-      pagination: buildPaginationMeta(result),
-    });
-  }
-);
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result.items,
+    pagination: buildPaginationMeta(result),
+  });
+});
 
-export const getCompanyById = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const company = await companyService.getCompanyById(req.params.id);
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: company,
-    });
-  }
-);
+export const getCompanyById = asyncHandler<
+  ValidatedRequest<GetCompanyByIdParams>
+>(async (req, res: Response): Promise<void> => {
+  const company = await companyService.getCompanyById(req.validatedParams.id);
+  res.status(HTTP_STATUS.OK).json({ success: true, data: company });
+});
 
 export const getMyCompany = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
+  async (req, res: Response): Promise<void> => {
     if (req.user!.role !== UserRole.EMPLOYER) {
       throw new ForbiddenError("Only employers can access this resource");
     }
-
     const company = await companyService.getCompanyByEmployerId(req.user!.id);
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: company,
-    });
+    res.status(HTTP_STATUS.OK).json({ success: true, data: company });
   }
 );
 
-export const getCompanyJobs = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const {
-      page = "1",
-      limit = "12",
-      sortBy = "createdAt",
-      order = "desc",
-    } = req.query;
+export const getCompanyJobs = asyncHandler<
+  ValidatedRequest<GetCompanyJobsParams, GetCompanyJobsQuery>
+>(async (req, res: Response): Promise<void> => {
+  const result = await companyService.getCompanyJobs(
+    req.validatedParams.id,
+    req.validatedQuery
+  );
 
-    const pagination = {
-      page: parseInt(page as string),
-      limit: parseInt(limit as string),
-      sortBy: sortBy as string,
-      order: (order as string).toUpperCase() as "ASC" | "DESC",
-    };
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result.items,
+    pagination: buildPaginationMeta(result),
+  });
+});
 
-    const result = await companyService.getCompanyJobs(
-      req.params.id,
-      pagination
-    );
+export const updateCompany = asyncHandler<
+  ValidatedRequest<
+    UpdateCompanyParams,
+    Record<string, never>,
+    UpdateCompanyBody
+  >
+>(async (req, res: Response): Promise<void> => {
+  const company = await companyService.updateCompany(
+    req.validatedParams.id,
+    req.user!.id,
+    req.body
+  );
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: HTTP_MESSAGE.UPDATED,
+    data: company,
+  });
+});
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result.items,
-      pagination: {
-        currentPage: result.page,
-        totalPages: result.totalPages,
-        total: result.total,
-        limit: pagination.limit,
-        hasNextPage: result.page < result.totalPages,
-        hasPrevPage: result.page > 1,
-      },
-    });
-  }
-);
-
-export const updateCompany = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const company = await companyService.updateCompany(
-      req.params.id,
-      req.user!.id,
-      req.body
-    );
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.UPDATED,
-      data: company,
-    });
-  }
-);
-
-export const deleteCompany = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    await companyService.deleteCompany(req.params.id, req.user!.id);
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.DELETED,
-    });
-  }
-);
+export const deleteCompany = asyncHandler<
+  ValidatedRequest<GetCompanyByIdParams>
+>(async (req, res: Response): Promise<void> => {
+  await companyService.deleteCompany(req.validatedParams.id, req.user!.id);
+  res
+    .status(HTTP_STATUS.OK)
+    .json({ success: true, message: HTTP_MESSAGE.DELETED });
+});
 
 /**
  * Upload company logo
  */
 export const uploadCompanyLogo = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
+  async (req, res: Response): Promise<void> => {
     if (req.user!.role !== UserRole.EMPLOYER) {
       throw new ForbiddenError("Only employers can upload company logos");
     }
-
     if (!req.file) {
       throw new BadRequestError("No file uploaded");
     }
-
     const result = await uploadService.uploadCompanyLogo(
       req.file.buffer,
       req.file.mimetype
     );
-
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
       message: "Company logo uploaded successfully",
-      data: {
-        logoUrl: result.url,
-        publicId: result.publicId,
-      },
+      data: { logoUrl: result.url, publicId: result.publicId },
     });
   }
 );
