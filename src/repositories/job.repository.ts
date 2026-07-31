@@ -179,9 +179,10 @@ export class JobRepository {
   private applySkillFilter(qb: SelectQueryBuilder<Job>, skillList: string[]) {
     // && = "overlap": job.skills có ít nhất 1 phần tử trùng với skillList
     // (giữ đúng semantics OR như logic ILIKE cũ, không phải match hết)
-    qb.andWhere("job.skills && :skills::text[]", {
-      skills: skillList.map((s) => s.toLocaleLowerCase()),
-    });
+    qb.andWhere(
+      `EXISTS (SELECT 1 FROM unnest(job.skills) AS s(skill) WHERE LOWER(skill) = ANY(:skills::text[]))`,
+      { skills: skillList.map((s) => s.toLocaleLowerCase()) }
+    );
     return qb;
   }
 

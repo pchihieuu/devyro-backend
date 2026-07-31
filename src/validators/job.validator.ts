@@ -17,7 +17,6 @@ export const getJobByIdSchema = z.object({
 });
 
 export type GetJobByIdParams = z.infer<typeof getJobByIdSchema>["params"];
-// export type GetJobByIdQuery = z.infer<typeof getJobByIdSchema>["query"];
 
 export const employerJobsQuerySchema = z.object({
   query: createPaginationSchema([
@@ -30,6 +29,26 @@ export const employerJobsQuerySchema = z.object({
 export type EmployerJobsQuery = z.infer<
   typeof employerJobsQuerySchema
 >["query"];
+
+const skillsInputField = z
+  .union([z.array(z.string()), z.string()])
+  .optional()
+  .transform((val) => {
+    if (!val) return undefined;
+    const arr = Array.isArray(val) ? val : val.split(",");
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const raw of arr) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLocaleLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(trimmed);
+      }
+    }
+    return result;
+  });
 
 const skillsField = z
   .union([z.array(z.string()), z.string()])
@@ -76,7 +95,7 @@ export const createJobSchema = z.object({
         .number()
         .positive("Maximum salary must be positive")
         .optional(),
-      skills: skillsField,
+      skills: skillsInputField,
     })
     .refine(
       (data) => {
@@ -114,7 +133,7 @@ export const updateJobSchema = z.object({
         .number()
         .positive("Maximum salary must be positive")
         .optional(),
-      skills: skillsField,
+      skills: skillsInputField,
     })
     .refine(
       (data) => {
