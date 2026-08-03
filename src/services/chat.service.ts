@@ -1,9 +1,23 @@
-import { AppDataSource } from "../config/database.config";
 import { Message, MessageType } from "../entities/Message.entity";
-import { Conversation } from "../entities/Conversation.entity";
-import { User } from "../entities/User.entity";
 import { NotFoundError, BadRequestError } from "../utils/errors";
+import { ensureOwnership } from "../utils/authorization.util";
 import { getWebSocketService } from "./websocket.service";
+import {
+  messageRepository,
+  MessageRepository,
+} from "../repositories/message.repository";
+import {
+  conversationRepository,
+  ConversationRepository,
+} from "../repositories/conversation.repository";
+import {
+  userRepository,
+  UserRepository,
+} from "../repositories/user.repository";
+import {
+  MessageWithParticipants,
+  ConversationSummary,
+} from "../types/chat.types";
 
 interface SendMessageData {
   receiverId: string;
@@ -13,46 +27,46 @@ interface SendMessageData {
 }
 
 export class ChatService {
-  private messageRepository = AppDataSource.getRepository(Message);
-  private conversationRepository = AppDataSource.getRepository(Conversation);
-  private userRepository = AppDataSource.getRepository(User);
+  constructor(
+    private readonly messageRepo: MessageRepository = messageRepository,
+    private readonly conversationRepo: ConversationRepository = conversationRepository,
+    private readonly userRepo: UserRepository = userRepository
+  ) {}
 
-  async sendMessage(senderId: string, data: SendMessageData): Promise<Message> {
+  async sendMessage(
+    senderId: string,
+    data: SendMessageData
+  ): Promise<MessageWithParticipants> {
     const { receiverId, content, type = MessageType.TEXT, fileUrl } = data;
 
-    // Validate + save song song
+    if (senderId === receiverId) {
+      throw new BadRequestError("Cannot send message to yourself");
+    }
+
     const [receiver, sender] = await Promise.all([
-      this.userRepository.findOne({
-        where: { id: receiverId },
-        select: ["id", "name", "avatar"],
-      }),
-      this.userRepository.findOne({
-        where: { id: senderId },
-        select: ["id", "name", "avatar"],
-      }),
+      this.userRepo.findByIdSelect(receiverId, ["id", "name", "avatar"]),
+      this.userRepo.findByIdSelect(senderId, ["id", "name", "avatar"]),
     ]);
 
     if (!receiver) throw new NotFoundError("Receiver not found");
-    if (senderId === receiverId)
-      throw new BadRequestError("Cannot send message to yourself");
+    if (!sender) throw new NotFoundError("Sender not found");
 
-    const message = this.messageRepository.create({
+    const message = this.messageRepo.create({
       senderId,
       receiverId,
       content,
       type,
       fileUrl,
     });
-    await this.messageRepository.save(message);
+    await this.messageRepo.save(message);
 
-    // ✅ WS NGAY — không chờ side effects
     try {
       const wsService = getWebSocketService();
       wsService.sendMessageToUser(receiverId, {
         id: message.id,
         senderId,
-        senderName: sender!.name,
-        senderAvatar: sender!.avatar,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
         content,
         type,
         fileUrl,
@@ -62,53 +76,35 @@ export class ChatService {
       console.error("WS send failed:", error);
     }
 
-    // ✅ Side effects fire-and-forget — không block response
     this.updateConversation(senderId, receiverId, content).catch((err) =>
       console.error("updateConversation error:", err)
     );
 
-    // Return ngay — không findOne lại
-    return Object.assign(message, { sender, receiver }) as Message;
+    return Object.assign(message, { sender, receiver }) as MessageWithParticipants;
   }
 
-  /**
-   * Get conversation messages
-   */
   async getMessages(
     userId: string,
     otherUserId: string,
     page: number = 1,
     limit: number = 50
   ): Promise<{ messages: Message[]; total: number; hasMore: boolean }> {
-    const skip = (page - 1) * limit;
-
-    const [messages, total] = await this.messageRepository.findAndCount({
-      where: [
-        { senderId: userId, receiverId: otherUserId },
-        { senderId: otherUserId, receiverId: userId },
-      ],
-      relations: ["sender", "receiver"],
-      order: { createdAt: "DESC" },
-      take: limit,
-      skip,
-    });
+    const [messages, total] = await this.messageRepo.findAndCountBetweenUsers(
+      userId,
+      otherUserId,
+      page,
+      limit
+    );
 
     return {
       messages: messages.reverse(),
       total,
-      hasMore: skip + messages.length < total,
+      hasMore: (page - 1) * limit + messages.length < total,
     };
   }
 
-  /**
-   * Get all conversations for a user
-   */
-  async getConversations(userId: string): Promise<any[]> {
-    const conversations = await this.conversationRepository.find({
-      where: [{ user1Id: userId }, { user2Id: userId }],
-      relations: ["user1", "user2"],
-      order: { lastMessageAt: "DESC" },
-    });
+  async getConversations(userId: string): Promise<ConversationSummary[]> {
+    const conversations = await this.conversationRepo.findAllForUser(userId);
 
     return conversations.map((conv) => {
       const isUser1 = conv.user1Id === userId;
@@ -133,22 +129,10 @@ export class ChatService {
     });
   }
 
-  /**
-   * Mark messages as read
-   */
   async markAsRead(userId: string, otherUserId: string): Promise<void> {
-    // Mark messages as read
-    await this.messageRepository.update(
-      {
-        senderId: otherUserId,
-        receiverId: userId,
-        isRead: false,
-      },
-      { isRead: true }
-    );
+    await this.messageRepo.markAsReadBetweenUsers(userId, otherUserId);
 
-    // Update conversation unread count
-    const conversation = await this.findOrCreateConversation(
+    const conversation = await this.conversationRepo.findOrCreateConversation(
       userId,
       otherUserId
     );
@@ -159,87 +143,34 @@ export class ChatService {
       conversation.user2UnreadCount = 0;
     }
 
-    await this.conversationRepository.save(conversation);
+    await this.conversationRepo.save(conversation);
   }
 
-  /**
-   * Delete a message
-   */
   async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await this.messageRepository.findOne({
-      where: { id: messageId },
-    });
+    const message = await this.messageRepo.findById(messageId);
 
     if (!message) {
       throw new NotFoundError("Message not found");
     }
 
-    if (message.senderId !== userId) {
-      throw new BadRequestError("You can only delete your own messages");
-    }
-
-    await this.messageRepository.remove(message);
-  }
-
-  /**
-   * Update or create conversation
-   */
-  private async updateConversation(
-    senderId: string,
-    receiverId: string,
-    lastMessage: string
-  ): Promise<void> {
-    const conversation = await this.findOrCreateConversation(
-      senderId,
-      receiverId
+    ensureOwnership(
+      message.senderId,
+      userId,
+      "You can only delete your own messages"
     );
 
-    conversation.lastMessage = lastMessage;
-    conversation.lastMessageSenderId = senderId;
-    conversation.lastMessageAt = new Date();
+    const { senderId, receiverId } = message;
+    await this.messageRepo.remove(message);
 
-    // Increment unread count for receiver
-    if (conversation.user1Id === receiverId) {
-      conversation.user1UnreadCount++;
-    } else {
-      conversation.user2UnreadCount++;
-    }
-
-    await this.conversationRepository.save(conversation);
+    // Nếu tin nhắn vừa xoá là lastMessage của conversation, preview trong
+    // danh sách conversation sẽ bị "ma" (hiển thị nội dung đã xoá) nếu
+    // không đồng bộ lại.
+    await this.syncLastMessageAfterDelete(senderId, receiverId);
   }
 
-  /**
-   * Find or create conversation
-   */
-  private async findOrCreateConversation(
-    userId1: string,
-    userId2: string
-  ): Promise<Conversation> {
-    let conversation = await this.conversationRepository.findOne({
-      where: [
-        { user1Id: userId1, user2Id: userId2 },
-        { user1Id: userId2, user2Id: userId1 },
-      ],
-    });
-
-    if (!conversation) {
-      conversation = this.conversationRepository.create({
-        user1Id: userId1,
-        user2Id: userId2,
-      });
-      await this.conversationRepository.save(conversation);
-    }
-
-    return conversation;
-  }
-
-  /**
-   * Get unread message count
-   */
   async getUnreadCount(userId: string): Promise<number> {
-    const conversations = await this.conversationRepository.find({
-      where: [{ user1Id: userId }, { user2Id: userId }],
-    });
+    const conversations =
+      await this.conversationRepo.findAllForUnreadCount(userId);
 
     return conversations.reduce((total, conv) => {
       const unread =
@@ -248,23 +179,16 @@ export class ChatService {
     }, 0);
   }
 
-  /**
-   * Start a new conversation with a user
-   */
   async startConversation(
     currentUserId: string,
     otherUserId: string
-  ): Promise<any> {
-    // Validate other user exists
-    const otherUser = await this.userRepository.findOne({
-      where: { id: otherUserId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-      },
-    });
+  ): Promise<ConversationSummary> {
+    const otherUser = await this.userRepo.findByIdSelect(otherUserId, [
+      "id",
+      "name",
+      "email",
+      "avatar",
+    ]);
 
     if (!otherUser) {
       throw new NotFoundError("User not found");
@@ -274,8 +198,7 @@ export class ChatService {
       throw new BadRequestError("Cannot start conversation with yourself");
     }
 
-    // Find or create conversation
-    const conversation = await this.findOrCreateConversation(
+    const conversation = await this.conversationRepo.findOrCreateConversation(
       currentUserId,
       otherUserId
     );
@@ -295,51 +218,33 @@ export class ChatService {
     };
   }
 
-  /**
-   * Delete entire conversation
-   */
   async deleteConversation(userId: string, otherUserId: string): Promise<void> {
-    // Validate other user exists
-    const otherUser = await this.userRepository.findOne({
-      where: { id: otherUserId },
-    });
+    const otherUser = await this.userRepo.findById(otherUserId);
 
     if (!otherUser) {
       throw new NotFoundError("User not found");
     }
 
-    // Find conversation
-    const conversation = await this.conversationRepository.findOne({
-      where: [
-        { user1Id: userId, user2Id: otherUserId },
-        { user1Id: otherUserId, user2Id: userId },
-      ],
-    });
+    const conversation = await this.conversationRepo.findByUsers(
+      userId,
+      otherUserId
+    );
 
     if (!conversation) {
       throw new NotFoundError("Conversation not found");
     }
 
-    // Delete all messages between these two users
-    await this.messageRepository.delete([
-      { senderId: userId, receiverId: otherUserId },
-      { senderId: otherUserId, receiverId: userId },
-    ]);
+    await this.messageRepo.deleteBetweenUsers(userId, otherUserId);
+    await this.conversationRepo.remove(conversation);
 
-    // Delete the conversation record
-    await this.conversationRepository.remove(conversation);
-
-    // Send WebSocket notification to both users to update their UI
     try {
       const wsService = getWebSocketService();
 
-      // Notify current user
       wsService.notifyConversationDeleted(userId, {
         otherUserId,
         conversationId: conversation.id,
       });
 
-      // Notify other user
       wsService.notifyConversationDeleted(otherUserId, {
         otherUserId: userId,
         conversationId: conversation.id,
@@ -347,6 +252,53 @@ export class ChatService {
     } catch (error) {
       console.error("Failed to send WebSocket notification:", error);
     }
+  }
+
+  // ---- private helpers ----
+
+  private async updateConversation(
+    senderId: string,
+    receiverId: string,
+    lastMessage: string
+  ): Promise<void> {
+    const conversation = await this.conversationRepo.findOrCreateConversation(
+      senderId,
+      receiverId
+    );
+
+    conversation.lastMessage = lastMessage;
+    conversation.lastMessageSenderId = senderId;
+    conversation.lastMessageAt = new Date();
+
+    if (conversation.user1Id === receiverId) {
+      conversation.user1UnreadCount++;
+    } else {
+      conversation.user2UnreadCount++;
+    }
+
+    await this.conversationRepo.save(conversation);
+  }
+
+  private async syncLastMessageAfterDelete(
+    userId1: string,
+    userId2: string
+  ): Promise<void> {
+    const conversation = await this.conversationRepo.findByUsers(
+      userId1,
+      userId2
+    );
+    if (!conversation) return;
+
+    const latest = await this.messageRepo.findLatestBetweenUsers(
+      userId1,
+      userId2
+    );
+
+    conversation.lastMessage = latest?.content ?? null;
+    conversation.lastMessageSenderId = latest?.senderId ?? null;
+    conversation.lastMessageAt = latest?.createdAt ?? null;
+
+    await this.conversationRepo.save(conversation);
   }
 }
 

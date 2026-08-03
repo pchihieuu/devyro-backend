@@ -1,144 +1,128 @@
-import { Request, Response, NextFunction } from "express";
+import { Response } from "express";
 import { chatService } from "../services/chat.service";
+import { asyncHandler } from "../utils/asyncHandler";
+import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { ValidatedRequest } from "../types/express";
+import {
+  DeleteConversationParams,
+  DeleteMessageParams,
+  GetMessagesParams,
+  GetMessagesQuery,
+  MarkAsReadParams,
+  SendMessageBody,
+  StartConversationBody,
+} from "../validators/chat.validator";
 
-export class ChatController {
-  async sendMessage(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { receiverId, content, type, fileUrl } = req.body;
+export const sendMessage = asyncHandler<
+  ValidatedRequest<{}, {}, SendMessageBody>
+>(async (req, res: Response): Promise<void> => {
+  const { receiverId, content, type, fileUrl } = req.body;
 
-      const message = await chatService.sendMessage(userId, {
-        receiverId,
-        content,
-        type,
-        fileUrl,
-      });
+  const message = await chatService.sendMessage(req.user!.id, {
+    receiverId,
+    content,
+    type,
+    fileUrl,
+  });
 
-      res.status(201).json({
-        success: true,
-        data: message,
-      });
-    } catch (error) {
-      next(error);
-    }
+  res.status(HTTP_STATUS.CREATED).json({
+    success: true,
+    data: message,
+  });
+});
+
+export const getMessages = asyncHandler<
+  ValidatedRequest<GetMessagesParams, GetMessagesQuery>
+>(async (req, res: Response): Promise<void> => {
+  const { otherUserId } = req.validatedParams;
+  const { page, limit } = req.validatedQuery;
+
+  const result = await chatService.getMessages(
+    req.user!.id,
+    otherUserId,
+    page,
+    limit
+  );
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result,
+  });
+});
+
+export const getConversations = asyncHandler(
+  async (req, res: Response): Promise<void> => {
+    const conversations = await chatService.getConversations(req.user!.id);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: conversations,
+    });
   }
+);
 
-  async getMessages(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { otherUserId } = req.params;
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
+export const markAsRead = asyncHandler<ValidatedRequest<MarkAsReadParams>>(
+  async (req, res: Response): Promise<void> => {
+    const { otherUserId } = req.validatedParams;
 
-      const result = await chatService.getMessages(
-        userId,
-        otherUserId,
-        page,
-        limit
-      );
+    await chatService.markAsRead(req.user!.id, otherUserId);
 
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: HTTP_MESSAGE.UPDATED,
+    });
   }
+);
 
-  async getConversations(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const conversations = await chatService.getConversations(userId);
+export const deleteMessage = asyncHandler<
+  ValidatedRequest<DeleteMessageParams>
+>(async (req, res: Response): Promise<void> => {
+  const { messageId } = req.validatedParams;
 
-      res.json({
-        success: true,
-        data: conversations,
-      });
-    } catch (error) {
-      next(error);
-    }
+  await chatService.deleteMessage(messageId, req.user!.id);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: HTTP_MESSAGE.DELETED,
+  });
+});
+
+export const getUnreadCount = asyncHandler(
+  async (req, res: Response): Promise<void> => {
+    const count = await chatService.getUnreadCount(req.user!.id);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: { count },
+    });
   }
+);
 
-  async markAsRead(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { otherUserId } = req.params;
+export const startConversation = asyncHandler<
+  ValidatedRequest<{}, {}, StartConversationBody>
+>(async (req, res: Response): Promise<void> => {
+  const { otherUserId } = req.body;
 
-      await chatService.markAsRead(userId, otherUserId);
+  const conversation = await chatService.startConversation(
+    req.user!.id,
+    otherUserId
+  );
 
-      res.json({
-        success: true,
-        message: "Messages marked as read",
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+  res.status(HTTP_STATUS.CREATED).json({
+    success: true,
+    data: conversation,
+  });
+});
 
-  async deleteMessage(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { messageId } = req.params;
+export const deleteConversation = asyncHandler<
+  ValidatedRequest<DeleteConversationParams>
+>(async (req, res: Response): Promise<void> => {
+  const { otherUserId } = req.validatedParams;
 
-      await chatService.deleteMessage(messageId, userId);
+  await chatService.deleteConversation(req.user!.id, otherUserId);
 
-      res.json({
-        success: true,
-        message: "Message deleted successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getUnreadCount(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const count = await chatService.getUnreadCount(userId);
-
-      res.json({
-        success: true,
-        data: { count },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-  async startConversation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { otherUserId } = req.body;
-
-      const conversation = await chatService.startConversation(
-        userId,
-        otherUserId
-      );
-
-      res.status(201).json({
-        success: true,
-        data: conversation,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async deleteConversation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user!.id;
-      const { otherUserId } = req.params;
-
-      await chatService.deleteConversation(userId, otherUserId);
-
-      res.json({
-        success: true,
-        message: "Conversation deleted successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-}
-
-export const chatController = new ChatController();
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: HTTP_MESSAGE.DELETED,
+  });
+});

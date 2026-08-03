@@ -6,10 +6,22 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User.entity";
 
+/**
+ * Bất biến: user1Id luôn là UUID nhỏ hơn user2Id khi so sánh string (chuẩn hoá
+ * bởi ConversationRepository.normalizeUserPair()). Không tự tạo Conversation
+ * bằng repo.create({ user1Id, user2Id }) ở nơi khác — luôn đi qua
+ * findOrCreateConversation() để giữ đúng thứ tự này, nếu không unique index
+ * bên dưới sẽ không chặn được conversation trùng khi 2 user nhắn cho nhau
+ * theo 2 chiều khác nhau.
+ */
 @Entity("conversations")
+@Index("IDX_conversations_user1Id_user2Id", ["user1Id", "user2Id"], {
+  unique: true,
+})
 export class Conversation {
   @PrimaryGeneratedColumn("uuid")
   id: string;
