@@ -1,31 +1,52 @@
-.PHONY: dev full monitoring down logs smoke load spike stress
+.PHONY: dev monitoring down down-monitoring restart restart-api ps logs logs-api smoke load spike stress clean
 
-PROFILES := --profile full --profile monitoring
+COMPOSE := docker compose -f docker-compose.dev.yml
+PROFILE_FULL := --profile full
+PROFILE_MONITORING := --profile full --profile monitoring
 
+# --- Dev: dùng khi thêm/đổi dependency, đổi Dockerfile, hoặc không chắc cần gì ---
+# Luôn an toàn để chạy: cache hit thì nhanh, cache miss thì tự rebuild đúng phần cần.
 dev:
-	docker compose -f docker-compose.yml up -d
-	npx cross-env RABBITMQ_URL=amqp://guest:guest@localhost:5672 npm run dev
+	$(COMPOSE) $(PROFILE_FULL) build api
+	$(COMPOSE) $(PROFILE_FULL) up -d --remove-orphans --renew-anon-volumes
 
-full:
-	docker compose -f docker-compose.yml --profile full up -d --remove-orphans
+# --- Restart nhanh: dùng khi chỉ sửa script/env trong package.json, không đổi dependency ---
+# Không rebuild image, chỉ restart process trong container để entrypoint.sh đọc lại package.json.
+restart-api:
+	$(COMPOSE) restart api
 
 monitoring:
-	docker compose -f docker-compose.yml $(PROFILES) up -d --remove-orphans
+	$(COMPOSE) $(PROFILE_MONITORING) build api
+	$(COMPOSE) $(PROFILE_MONITORING) up -d --remove-orphans --renew-anon-volumes
 
 down:
-	docker compose -f docker-compose.yml $(PROFILES) down
+	$(COMPOSE) $(PROFILE_FULL) down
+
+down-monitoring:
+	$(COMPOSE) $(PROFILE_MONITORING) down
+
+restart: down dev
+
+ps:
+	$(COMPOSE) ps
 
 logs:
-	docker compose -f docker-compose.yml logs -f rabbitmq
+	$(COMPOSE) logs -f rabbitmq
+
+logs-api:
+	$(COMPOSE) logs -f api
 
 smoke:
-	docker compose -f docker-compose.yml $(PROFILES) run --rm k6 run /scripts/smoke.test.js
+	$(COMPOSE) $(PROFILE_MONITORING) run --rm k6 run /scripts/smoke.test.js
 
 load:
-	docker compose -f docker-compose.yml $(PROFILES) run --rm k6 run /scripts/load.test.js
+	$(COMPOSE) $(PROFILE_MONITORING) run --rm k6 run /scripts/load.test.js
 
 spike:
-	docker compose -f docker-compose.yml $(PROFILES) run --rm k6 run /scripts/spike.test.js
+	$(COMPOSE) $(PROFILE_MONITORING) run --rm k6 run /scripts/spike.test.js
 
 stress:
-	docker compose -f docker-compose.yml $(PROFILES) run --rm k6 run /scripts/stress.test.js
+	$(COMPOSE) $(PROFILE_MONITORING) run --rm k6 run /scripts/stress.test.js
+
+clean:
+	$(COMPOSE) $(PROFILE_MONITORING) down -v
