@@ -1,11 +1,38 @@
 import { z } from "zod";
+import { AvailabilityStatus, WorkPreference } from "../entities/User.entity";
+export const WorkPreferenceEnum = z.nativeEnum(WorkPreference);
+export const AvailabilityStatusEnum = z.nativeEnum(AvailabilityStatus);
 
-export const WorkPreferenceEnum = z.enum(["onsite", "remote", "hybrid"]);
-export const AvailabilityStatusEnum = z.enum([
-  "available",
-  "busy",
-  "unavailable",
-]);
+const optionalUrlField = (message: string) =>
+  z
+    .string()
+    .url(message)
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => (val === "" ? undefined : val));
+
+// FIX: điểm chuẩn hoá skills DUY NHẤT trong toàn hệ thống — trim, lowercase, dedupe.
+// Bắt buộc phải chuẩn hoá ở đây (không phải ở service) vì skills giờ là text[] thật,
+// dùng cho toán tử && (overlap) để match với Job.skills. Nếu để lọt "React" và "react"
+// là 2 giá trị khác nhau, overlap match sẽ sai/miss âm thầm mà không có lỗi nào báo ra.
+
+// Chuẩn hoá skills DUY NHẤT — dùng chung cho cả field lưu (skillsField) lẫn field filter
+// (searchUsersSchema.skills), tránh lặp lại bug "2 nơi transform khác nhau" đã gặp ở job module.
+const normalizeSkills = (skills: string[]): string[] =>
+  Array.from(
+    new Set(skills.map((s) => s.trim().toLowerCase()).filter(Boolean))
+  );
+
+const skillsField = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1, "Skill name cannot be empty")
+      .max(50, "Skill name must not exceed 50 characters")
+  )
+  .max(50, "Maximum 50 skills allowed")
+  .transform(normalizeSkills);
 
 // Experience schema
 const experienceSchema = z.object({
@@ -17,11 +44,7 @@ const experienceSchema = z.object({
     .string()
     .min(1, "Company is required")
     .max(100, "Company must not exceed 100 characters"),
-  companyLink: z
-    .string()
-    .url("Invalid company URL")
-    .optional()
-    .or(z.literal("")),
+  companyLink: optionalUrlField("Invalid company URL"),
   description: z
     .string()
     .min(1, "Description is required")
@@ -47,11 +70,11 @@ const projectSchema = z.object({
   technologies: z
     .array(z.string().max(50, "Technology name must not exceed 50 characters"))
     .min(1, "At least one technology is required"),
-  link: z.string().url("Invalid project URL").optional().or(z.literal("")),
-  image: z.string().url("Invalid image URL").optional().or(z.literal("")),
+  link: optionalUrlField("Invalid project URL"),
+  image: optionalUrlField("Invalid image URL"),
 });
 
-// Update profile schema
+// --- Update profile schema ---
 export const updateProfileSchema = z.object({
   body: z
     .object({
@@ -80,6 +103,7 @@ export const updateProfileSchema = z.object({
         .optional()
         .or(z.literal("")),
 
+      workPreference: WorkPreferenceEnum.optional(),
       hourlyRateMin: z
         .number()
         .min(0, "Hourly rate must be positive")
@@ -100,10 +124,7 @@ export const updateProfileSchema = z.object({
 
       availabilityStatus: AvailabilityStatusEnum.optional(),
 
-      skills: z
-        .array(z.string().max(50, "Skill name must not exceed 50 characters"))
-        .max(50, "Maximum 50 skills allowed")
-        .optional(),
+      skills: skillsField.optional(),
     })
     .strip()
     .refine(
@@ -123,7 +144,10 @@ export const updateProfileSchema = z.object({
         path: ["hourlyRateMax"],
       }
     ),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
+
 // Delete resume schema
 export const deleteResumeSchema = z.object({
   body: z.object({}).optional(),
@@ -136,12 +160,26 @@ export const getPublicProfileSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid user ID format"),
   }),
+  body: z.object({}).optional(),
+  query: z.object({}).optional(),
 });
 
 // Search users schema
 export const searchUsersSchema = z.object({
   query: z.object({
     q: z.string().min(1, "Search query is required"),
+    // FIX: filter theo skill dùng chung skillsField (đã lowercase) để so khớp đúng
+    // với dữ liệu đã chuẩn hoá khi lưu — tránh lặp lại bug "skills có 2 field
+    // transform khác nhau" đã từng gặp ở job module. Chấp nhận cả 2 dạng Express
+    // parse ra: ?skills=a (string) hoặc ?skills=a&skills=b (array).
+    skills: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((val) => {
+        if (val === undefined) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return normalizeSkills(arr);
+      }),
     page: z
       .string()
       .regex(/^\d+$/, "Page must be a number")
@@ -153,13 +191,14 @@ export const searchUsersSchema = z.object({
       .optional()
       .transform((val) => (val ? Math.min(parseInt(val, 10), 100) : 20)),
   }),
+  body: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
-// Experience management schemas
+// --- Experience management schemas ---
 export const addExperienceSchema = z.object({
   body: experienceSchema.refine(
     (data) => {
-      // Validate that endDate is after startDate if both are provided
       if (data.startDate && data.endDate) {
         const start = new Date(data.startDate);
         const end = new Date(data.endDate);
@@ -172,6 +211,8 @@ export const addExperienceSchema = z.object({
       path: ["endDate"],
     }
   ),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
 export const updateExperienceSchema = z.object({
@@ -183,17 +224,22 @@ export const updateExperienceSchema = z.object({
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided",
     }),
+  query: z.object({}).optional(),
 });
 
 export const deleteExperienceSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid experience ID format"),
   }),
+  body: z.object({}).optional(),
+  query: z.object({}).optional(),
 });
 
-// Project management schemas
+// --- Project management schemas ---
 export const addProjectSchema = z.object({
   body: projectSchema,
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
 export const updateProjectSchema = z.object({
@@ -203,12 +249,15 @@ export const updateProjectSchema = z.object({
   body: projectSchema.partial().refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
   }),
+  query: z.object({}).optional(),
 });
 
 export const deleteProjectSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid project ID format"),
   }),
+  body: z.object({}).optional(),
+  query: z.object({}).optional(),
 });
 
 // Get my profile schema
@@ -217,3 +266,23 @@ export const getMyProfileSchema = z.object({
   query: z.object({}).optional(),
   params: z.object({}).optional(),
 });
+
+export type UpdateProfileBody = z.infer<typeof updateProfileSchema>["body"];
+export type GetPublicProfileParams = z.infer<
+  typeof getPublicProfileSchema
+>["params"];
+export type SearchUsersQuery = z.infer<typeof searchUsersSchema>["query"];
+export type AddExperienceBody = z.infer<typeof addExperienceSchema>["body"];
+export type UpdateExperienceParams = z.infer<
+  typeof updateExperienceSchema
+>["params"];
+export type UpdateExperienceBody = z.infer<
+  typeof updateExperienceSchema
+>["body"];
+export type DeleteExperienceParams = z.infer<
+  typeof deleteExperienceSchema
+>["params"];
+export type AddProjectBody = z.infer<typeof addProjectSchema>["body"];
+export type UpdateProjectParams = z.infer<typeof updateProjectSchema>["params"];
+export type UpdateProjectBody = z.infer<typeof updateProjectSchema>["body"];
+export type DeleteProjectParams = z.infer<typeof deleteProjectSchema>["params"];

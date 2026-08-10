@@ -1,34 +1,74 @@
-import { AvailabilityStatus } from "../entities/User.entity";
+import { Experience, Project, User } from "../entities/User.entity";
+import {
+  AddExperienceBody,
+  AddProjectBody,
+  SearchUsersQuery,
+  UpdateExperienceBody,
+  UpdateProfileBody,
+  UpdateProjectBody,
+} from "../validators/user.validator";
 
-export interface ExperienceItem {
-  title: string;
-  company: string;
-  companyLink?: string;
-  description: string;
-  startDate: string;
-  endDate?: string;
-}
+export type UpdateProfileData = UpdateProfileBody;
+export type ExperienceItem = AddExperienceBody;
+export type ExperienceUpdateItem = UpdateExperienceBody;
+export type ProjectItem = AddProjectBody;
+export type ProjectUpdateItem = UpdateProjectBody;
 
-export interface ProjectItem {
-  title: string;
-  description: string;
-  technologies: string[];
-  link?: string;
-  image?: string;
-}
+export type ExperienceWithId = Experience;
+export type ProjectWithId = Project;
 
-export interface UpdateProfileData {
-  name?: string;
-  avatar?: string;
-  resume?: string;
-  title?: string;
-  bio?: string;
-  location?: string;
-  hourlyRateMin?: number;
-  hourlyRateMax?: number;
-  responseTimeHours?: number;
-  availabilityStatus?: AvailabilityStatus;
-  skills?: string[];
-}
-export type ExperienceUpdateItem = Partial<ExperienceItem>;
-export type ProjectUpdateItem = Partial<ProjectItem>;
+export type SearchUsersOptions = SearchUsersQuery;
+
+export type PublicProfileDto = Pick<
+  User,
+  | "id"
+  | "name"
+  | "role"
+  | "avatar"
+  | "username"
+  | "title"
+  | "bio"
+  | "location"
+  | "workPreference"
+  | "hourlyRateMin"
+  | "hourlyRateMax"
+  | "completionRate"
+  | "totalProjects"
+  | "responseTimeHours"
+  | "availabilityStatus"
+  | "skills"
+  | "experience"
+  | "projects"
+  | "rating"
+  | "reviewCount"
+  | "createdAt"
+  | "updatedAt"
+> & { resume?: string };
+
+export type MyProfileDto = Pick<
+  User,
+  | "id"
+  | "name"
+  | "email"
+  | "role"
+  | "avatar"
+  | "resume"
+  | "username"
+  | "title"
+  | "bio"
+  | "location"
+  | "workPreference"
+  | "hourlyRateMin"
+  | "hourlyRateMax"
+  | "completionRate"
+  | "totalProjects"
+  | "responseTimeHours"
+  | "availabilityStatus"
+  | "skills"
+  | "experience"
+  | "projects"
+  | "rating"
+  | "reviewCount"
+  | "createdAt"
+  | "updatedAt"
+>;

@@ -2,6 +2,7 @@ import {
   deleteFromCloudinary,
   extractPublicId,
 } from "../utils/cloudinary.utils";
+import crypto from "crypto";
 import { User, UserRole } from "../entities/User.entity";
 import {
   NotFoundError,
@@ -18,6 +19,8 @@ import {
   ProjectItem,
   ProjectUpdateItem,
   ExperienceUpdateItem,
+  PublicProfileDto,
+  MyProfileDto,
 } from "../types/user.types";
 import {
   buildPaginatedResult,
@@ -31,18 +34,13 @@ export class UserService {
   async updateProfile(
     userId: string,
     data: UpdateProfileData
-  ): Promise<Partial<User>> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+  ): Promise<MyProfileDto> {
+    const user = await this.getUserOrThrow(userId);
 
-    // Check quyền trước khi mutate bất cứ gì
     if (data.resume !== undefined && user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can update resume");
     }
 
-    // Fix: validate hourlyRateMin/Max trên giá trị SAU KHI MERGE với DB.
-    // Zod refine ở schema chỉ thấy payload của request này, không biết giá trị cũ trong DB,
-    // nên partial update (chỉ gửi 1 trong 2 field) có thể tạo ra min > max mà không bị chặn.
     if (data.hourlyRateMin !== undefined || data.hourlyRateMax !== undefined) {
       const nextMin =
         data.hourlyRateMin !== undefined
@@ -59,8 +57,6 @@ export class UserService {
       }
     }
 
-    // Lưu URL cũ để xoá SAU khi save DB thành công, tránh mất file mồ côi
-    // nếu save() throw giữa chừng (mất kết nối DB, constraint lỗi...).
     const oldAvatar = user.avatar;
     const oldResume = user.resume;
     const avatarChanged =
@@ -70,10 +66,10 @@ export class UserService {
 
     if (data.name !== undefined && data.name.trim() !== "")
       user.name = data.name;
-    if (avatarChanged) user.avatar = data.avatar!;
-    if (resumeChanged) user.resume = data.resume!;
 
-    // "" nghĩa là chủ đích xoá field, khác với `name` (bỏ qua nếu rỗng)
+    if (avatarChanged) user.avatar = data.avatar || null;
+    if (resumeChanged) user.resume = data.resume || null;
+
     if (data.title !== undefined) user.title = data.title || null;
     if (data.bio !== undefined) user.bio = data.bio || null;
     if (data.location !== undefined) user.location = data.location || null;
@@ -84,13 +80,17 @@ export class UserService {
       user.hourlyRateMax = data.hourlyRateMax;
     if (data.responseTimeHours !== undefined)
       user.responseTimeHours = data.responseTimeHours;
+    if (data.workPreference !== undefined)
+      user.workPreference = data.workPreference;
     if (data.availabilityStatus !== undefined)
       user.availabilityStatus = data.availabilityStatus;
+
+    // data.skills ở đây đã được validator lowercase + dedupe, service chỉ gán thẳng
+    // (không xử lý lại chuẩn hoá — tránh 2 nơi transform như bug từng gặp).
     if (data.skills !== undefined) user.skills = data.skills;
 
     const saved = await this.userRepo.save(user);
 
-    // Chỉ xoá file cũ SAU KHI save DB chắc chắn thành công
     if (avatarChanged) await this.deleteOldFile(oldAvatar, "image");
     if (resumeChanged) await this.deleteOldFile(oldResume, "raw");
 
@@ -98,8 +98,7 @@ export class UserService {
   }
 
   async deleteResume(userId: string): Promise<void> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
     if (user.role !== UserRole.JOBSEEKER) {
       throw new ForbiddenError("Only jobseekers can delete resume");
     }
@@ -109,20 +108,28 @@ export class UserService {
     user.resume = null;
     await this.userRepo.save(user);
 
-    // Xoá file sau khi save DB thành công, cùng nguyên tắc với updateProfile
     await this.deleteOldFile(oldResume, "raw");
   }
 
-  async getPublicProfile(userId: string): Promise<Partial<User>> {
+  async getPublicProfile(
+    userId: string,
+    viewer?: { id: string; role: UserRole }
+  ): Promise<PublicProfileDto> {
     const user = await this.userRepo.findByIdWithCompany(userId);
     if (!user) throw new NotFoundError("User not found");
 
+    const canViewResume =
+      user.role === UserRole.JOBSEEKER &&
+      !!viewer &&
+      (viewer.role === UserRole.EMPLOYER ||
+        viewer.role === UserRole.ADMIN ||
+        viewer.id === user.id);
     return {
       id: user.id,
       name: user.name,
       role: user.role,
       avatar: user.avatar || "",
-      resume: user.role === UserRole.JOBSEEKER ? user.resume || "" : undefined,
+      resume: canViewResume ? user.resume || "" : undefined,
       username: user.username,
       title: user.title,
       bio: user.bio,
@@ -144,13 +151,13 @@ export class UserService {
     };
   }
 
-  async getMyProfile(userId: string): Promise<Partial<User>> {
+  async getMyProfile(userId: string): Promise<MyProfileDto> {
     const user = await this.userRepo.findByIdSelectProfile(userId);
     if (!user) throw new NotFoundError("User not found");
     return user;
   }
 
-  private toMyProfileDto(user: User): Partial<User> {
+  private toMyProfileDto(user: User): MyProfileDto {
     return {
       id: user.id,
       name: user.name,
@@ -179,18 +186,24 @@ export class UserService {
     };
   }
 
+  /**
+   * FIX: nhận thêm `skills` (đã lowercase từ validator) để filter bằng overlap ở
+   * repository, thay vì chỉ search theo tên/email/username như trước.
+   */
   async searchUsers(
     query: string,
     currentUserId: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    skills?: string[]
   ): Promise<PaginatedResult<Partial<User>>> {
     const skip = getSkip(page, limit);
     const [users, total] = await this.userRepo.searchUsers(
       query,
       currentUserId,
       skip,
-      limit
+      limit,
+      skills
     );
     return buildPaginatedResult(users, total, page, limit);
   }
@@ -199,8 +212,7 @@ export class UserService {
     userId: string,
     experience: ExperienceItem
   ): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
 
     const experiences = user.experience || [];
     experiences.push({ id: crypto.randomUUID(), ...experience });
@@ -214,17 +226,13 @@ export class UserService {
     experienceId: string,
     experience: ExperienceUpdateItem
   ): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
 
     const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
     if (idx === -1) throw new NotFoundError("Experience not found");
 
-    // Merge với item cũ, chỉ field nào client gửi lên mới bị ghi đè
     const merged = { ...user.experience[idx], ...experience, id: experienceId };
 
-    // Validate thứ tự ngày trên state SAU KHI MERGE, không phải trên payload gửi lên,
-    // vì payload có thể chỉ chứa 1 trong 2 field ngày.
     if (merged.startDate && merged.endDate) {
       const start = new Date(merged.startDate);
       const end = new Date(merged.endDate);
@@ -238,8 +246,7 @@ export class UserService {
   }
 
   async deleteExperience(userId: string, experienceId: string): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
     const idx = (user.experience || []).findIndex((e) => e.id === experienceId);
     if (idx === -1) throw new NotFoundError("Experience not found");
 
@@ -248,8 +255,7 @@ export class UserService {
   }
 
   async addProject(userId: string, project: ProjectItem): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
 
     const projects = user.projects || [];
     projects.push({ id: crypto.randomUUID(), ...project });
@@ -263,8 +269,7 @@ export class UserService {
     projectId: string,
     project: ProjectUpdateItem
   ): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
 
     const index = (user.projects || []).findIndex((p) => p.id === projectId);
     if (index === -1) throw new NotFoundError("Project not found");
@@ -283,8 +288,7 @@ export class UserService {
   }
 
   async deleteProject(userId: string, projectId: string): Promise<User> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    const user = await this.getUserOrThrow(userId);
     const index = (user.projects || []).findIndex((p) => p.id === projectId);
     if (index === -1) throw new NotFoundError("Project not found");
 
@@ -295,22 +299,6 @@ export class UserService {
     if (oldImage) await this.deleteOldFile(oldImage, "image");
 
     return saved;
-  }
-
-  private async deleteOldFile(
-    fileUrl: string | null | undefined,
-    resourceType: "image" | "raw"
-  ): Promise<void> {
-    if (fileUrl) {
-      const publicId = extractPublicId(fileUrl);
-      if (publicId) {
-        try {
-          await deleteFromCloudinary(publicId, resourceType);
-        } catch (error) {
-          console.error(`Error deleting old ${resourceType}:`, error);
-        }
-      }
-    }
   }
 
   async updateAvatar(userId: string, newAvatarUrl: string): Promise<void> {
@@ -342,6 +330,28 @@ export class UserService {
 
     if (oldResume && oldResume !== newResumeUrl) {
       await this.deleteOldFile(oldResume, "raw");
+    }
+  }
+
+  private async getUserOrThrow(userId: string): Promise<User> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
+    return user;
+  }
+
+  private async deleteOldFile(
+    fileUrl: string | null | undefined,
+    resourceType: "image" | "raw"
+  ): Promise<void> {
+    if (fileUrl) {
+      const publicId = extractPublicId(fileUrl);
+      if (publicId) {
+        try {
+          await deleteFromCloudinary(publicId, resourceType);
+        } catch (error) {
+          console.error(`Error deleting old ${resourceType}:`, error);
+        }
+      }
     }
   }
 }

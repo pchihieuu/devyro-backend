@@ -7,6 +7,7 @@ import {
   DeleteDateColumn,
   OneToMany,
   OneToOne,
+  Index,
 } from "typeorm";
 import { Job } from "./Job.entity";
 import { Application } from "./Application.entity";
@@ -32,7 +33,7 @@ export enum AvailabilityStatus {
   UNAVAILABLE = "unavailable",
 }
 
-interface Experience {
+export interface Experience {
   id: string;
   title: string;
   company: string;
@@ -42,7 +43,7 @@ interface Experience {
   endDate?: string;
 }
 
-interface Project {
+export interface Project {
   id: string;
   title: string;
   description: string;
@@ -52,6 +53,7 @@ interface Project {
 }
 
 @Entity("users")
+@Index("IDX_users_skills_gin", { synchronize: false })
 export class User {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -119,7 +121,7 @@ export class User {
   })
   availabilityStatus: AvailabilityStatus;
 
-  @Column({ type: "simple-array", nullable: true })
+  @Column({ type: "text", array: true, nullable: true, default: null })
   skills: string[];
 
   @Column({ type: "json", nullable: true })
