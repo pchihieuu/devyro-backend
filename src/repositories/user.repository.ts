@@ -29,6 +29,10 @@ const MY_PROFILE_SELECT = {
   updatedAt: true,
 } as const;
 
+type UpdatableUserFields = Omit<
+  User,
+  "jobs" | "applications" | "savedJobs" | "company" | "notifications"
+>;
 export class UserRepository {
   private repo: Repository<User> = AppDataSource.getRepository(User);
 
@@ -134,7 +138,10 @@ export class UserRepository {
     });
   }
 
-  async findByIdSelect(userId: string, select: (keyof User)[]): Promise<User | null> {
+  async findByIdSelect(
+    userId: string,
+    select: (keyof User)[]
+  ): Promise<User | null> {
     return this.repo.findOne({ where: { id: userId }, select });
   }
 
@@ -142,7 +149,10 @@ export class UserRepository {
     return this.repo.save(user);
   }
 
-  async updateFields(userId: string, fields: Partial<User>): Promise<void> {
+  async updateFields(
+    userId: string,
+    fields: Partial<UpdatableUserFields>
+  ): Promise<void> {
     await this.repo.update(userId, fields);
   }
 }
