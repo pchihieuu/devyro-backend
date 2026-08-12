@@ -13,8 +13,9 @@ import { jobRepository, JobRepository } from "../repositories/job.repository";
 import {
   applicationRepository,
   ApplicationRepository,
-  MyApplicationsQuery,
 } from "../repositories/application.repository";
+import { MyApplicationsResult, TriggerAIAnalysisResult } from "../types/application.types";
+import { GetMyApplicationsQuery } from "../validators/application.validator";
 
 export class ApplicationService {
   constructor(
@@ -169,7 +170,7 @@ export class ApplicationService {
   async triggerAIAnalysis(
     applicationId: string,
     employerId: string
-  ): Promise<{ message: string; analysis?: any }> {
+  ): Promise<TriggerAIAnalysisResult> {
     const application =
       await this.applicationRepo.findByIdWithJobAndCompany(applicationId);
 
@@ -212,13 +213,8 @@ export class ApplicationService {
    */
   async getMyApplications(
     applicantId: string,
-    pagination: MyApplicationsQuery
-  ): Promise<{
-    applications: Application[];
-    total: number;
-    page: number;
-    totalPages: number;
-  }> {
+    pagination: GetMyApplicationsQuery
+  ): Promise<MyApplicationsResult> {
     const [applications, total] =
       await this.applicationRepo.findAndCountByApplicant(
         applicantId,

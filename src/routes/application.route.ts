@@ -5,6 +5,7 @@ import {
   applyToJobSchema,
   getApplicantsSchema,
   getApplicationByIdSchema,
+  getMyApplicationsSchema,
   updateApplicationStatusSchema,
 } from "../validators/application.validator";
 import {
@@ -28,7 +29,12 @@ router.post(
   applyToJob
 );
 
-router.get(ROUTES.APPLICATIONS.MY, protect, getMyApplications);
+router.get(
+  ROUTES.APPLICATIONS.MY,
+  protect,
+  validate(getMyApplicationsSchema),
+  getMyApplications
+);
 
 router.get(
   ROUTES.APPLICATIONS.JOB_APPLICATIONS,
@@ -51,10 +57,15 @@ router.put(
   updateStatus
 );
 
-router.delete(ROUTES.APPLICATIONS.WITH_DRAW, protect, withdrawApplication);
+router.delete(
+  ROUTES.APPLICATIONS.WITH_DRAW,
+  protect,
+  validate(getApplicationByIdSchema),
+  withdrawApplication
+);
 
 router.post(
-ROUTES.APPLICATIONS.ANALYZE,
+  ROUTES.APPLICATIONS.ANALYZE,
   protect,
   validate(getApplicationByIdSchema),
   triggerAIAnalysis

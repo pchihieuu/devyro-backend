@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export function createPaginationSchema<T extends [string, ...string[]]>(
+export function createPaginationSchema<T extends readonly [string, ...string[]]>(
   sortableFields: T,
   defaultSortBy: T[number] = sortableFields[0]
 ) {

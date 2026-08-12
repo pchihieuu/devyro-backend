@@ -1,11 +1,8 @@
 import { AppDataSource } from "../config/database.config";
 import { Application, ApplicationStatus } from "../entities/Application.entity";
-import { Not } from "typeorm";
-import { PaginationOptions, getSkip } from "../utils/pagination.util";
-
-export interface MyApplicationsQuery extends PaginationOptions {
-  status?: string;
-}
+import { FindOptionsWhere, Not } from "typeorm";
+import { getSkip } from "../utils/pagination.util";
+import { GetMyApplicationsQuery } from "../validators/application.validator";
 
 const JOB_LIST_SELECT = {
   id: true,
@@ -35,12 +32,13 @@ const APPLICANT_SELECT = {
   resume: true,
 } as const;
 
+type ApplicationWritableFields = Omit<Application, "job" | "applicant">;
 export class ApplicationRepository {
   private repo = AppDataSource.getRepository(Application);
 
   // ---- write ops ----
 
-  create(data: Partial<Application>): Application {
+  create(data: Partial<ApplicationWritableFields>): Application {
     return this.repo.create(data);
   }
 
@@ -48,7 +46,10 @@ export class ApplicationRepository {
     return this.repo.save(application);
   }
 
-  async update(id: string, data: Partial<Application>): Promise<void> {
+  async update(
+    id: string,
+    data: Partial<ApplicationWritableFields>
+  ): Promise<void> {
     await this.repo.update(id, data);
   }
 
@@ -112,21 +113,18 @@ export class ApplicationRepository {
 
   // ---- list reads ----
 
+  /**
+   * status không truyền -> ẩn Withdrawn khỏi list mặc định.
+   * status đã được validate là ApplicationStatus hợp lệ ở validator layer,
+   * không cần check lại "enumValue" như trước (dead code, 2 nguồn validate).
+   */
   async findAndCountByApplicant(
     applicantId: string,
-    { page, limit, sortBy, order, status }: MyApplicationsQuery
+    { page, limit, sortBy, order, status }: GetMyApplicationsQuery
   ): Promise<[Application[], number]> {
-    const where: any = { applicantId };
-
-    if (status) {
-      const enumValue = Object.values(ApplicationStatus).find(
-        (v) => v === status
-      );
-      if (enumValue) where.status = enumValue;
-    } else {
-      // Hide withdrawn applications from the default list view
-      where.status = Not(ApplicationStatus.WITHDRAWN);
-    }
+    const where: FindOptionsWhere<Application> = status
+      ? { applicantId, status }
+      : { applicantId, status: Not(ApplicationStatus.WITHDRAWN) };
 
     return this.repo.findAndCount({
       where,

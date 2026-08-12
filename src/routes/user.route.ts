@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protect } from "../middlewares/auth.middleware";
+import { optionalAuth, protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
 import {
   updateProfileSchema,
@@ -103,6 +103,7 @@ router.delete(
 
 router.get(
   ROUTES.USERS.BY_ID,
+  optionalAuth,
   validate(getPublicProfileSchema),
   getPublicProfile
 );
