@@ -36,14 +36,7 @@ export class Notification {
   isRead: boolean;
 
   @Column({ type: "json", nullable: true })
-  metadata: {
-    applicationId?: string;
-    jobId?: string;
-    jobTitle?: string;
-    companyName?: string;
-    status?: string;
-    applicantName?: string;
-  };
+  metadata: Record<string, unknown> | null;
 
   @CreateDateColumn()
   createdAt: Date;

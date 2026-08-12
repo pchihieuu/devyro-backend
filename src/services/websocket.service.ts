@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/database.config";
 import { User } from "../entities/User.entity";
 import { groupChatService } from "./group-chat.service";
+import { NotificationWSPayload } from "../types/notification.types";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -192,14 +193,7 @@ export class WebSocketService {
 
   public sendNotificationToUser(
     userId: string,
-    notification: {
-      id: string;
-      title: string;
-      message: string;
-      type: string;
-      metadata?: unknown;
-      createdAt: Date;
-    }
+    notification: NotificationWSPayload
   ) {
     this.io.to(`user:${userId}`).emit("notification", notification);
   }
