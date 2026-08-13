@@ -17,6 +17,10 @@ import {
   UserRepository,
 } from "../repositories/user.repository";
 import { CompanyDetail } from "../types/company.types";
+import {
+  CreateCompanyBody,
+  UpdateCompanyBody,
+} from "../validators/company.validator";
 
 export class CompanyService {
   constructor(
@@ -27,7 +31,7 @@ export class CompanyService {
 
   async createCompany(
     employerId: string,
-    companyData: Partial<Company>
+    companyData: CreateCompanyBody
   ): Promise<Company> {
     const user = await this.userRepo.findById(employerId);
     if (!user) throw new NotFoundError("User not found");
@@ -53,7 +57,7 @@ export class CompanyService {
 
   private async restoreCompany(
     companyId: string,
-    companyData: Partial<Company>
+    companyData: CreateCompanyBody
   ): Promise<Company> {
     await this.companyRepo.restore(companyId);
     const restored = await this.companyRepo.findById(companyId);
@@ -102,7 +106,7 @@ export class CompanyService {
   async updateCompany(
     companyId: string,
     employerId: string,
-    updates: Partial<Company>
+    updates: UpdateCompanyBody
   ): Promise<Company> {
     const company = await this.companyRepo.findById(companyId);
     if (!company) throw new NotFoundError("Company not found");

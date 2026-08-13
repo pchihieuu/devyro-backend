@@ -58,6 +58,7 @@ export const ROUTES = {
   },
   NOTIFICATIONS: {
     BASE: "/notifications",
+    LIST: "/",
     BY_ID: "/:id",
     UNREAD_COUNT: "/unread-count",
     MARK_READ: "/:id/read",
@@ -69,6 +70,7 @@ export const ROUTES = {
   },
   COMPANIES: {
     BASE: "/companies",
+    LIST: "/",
     BY_ID: "/:id",
     MY: "/my",
     JOBS: "/:id/jobs",

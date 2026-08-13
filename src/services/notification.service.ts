@@ -1,4 +1,3 @@
-import { AppDataSource } from "../config/database.config";
 import {
   Notification,
   NotificationType,
@@ -6,25 +5,25 @@ import {
 import { getWebSocketService } from "./websocket.service";
 import { NotFoundError } from "../utils/errors";
 import {
+  notificationRepository,
+  NotificationRepository,
+} from "../repositories/notification.repository";
+import {
   CreateNotificationData,
-  GetMyNotificationsResult,
+  NotificationsListResult,
   NotificationWSPayload,
 } from "../types/notification.types";
-import {
-  buildPaginatedResult,
-  getSkip,
-  PaginatedResult,
-} from "../utils/pagination.util";
+import { buildPaginatedResult, getSkip } from "../utils/pagination.util";
 
 export class NotificationService {
-  private notificationRepository = AppDataSource.getRepository(Notification);
+  constructor(
+    private readonly notificationRepo: NotificationRepository = notificationRepository
+  ) {}
 
   async createNotification(
     data: CreateNotificationData
   ): Promise<Notification> {
-    const notification = this.notificationRepository.create(data);
-    const savedNotification =
-      await this.notificationRepository.save(notification);
+    const savedNotification = await this.notificationRepo.create(data);
 
     try {
       const wsService = getWebSocketService();
@@ -33,7 +32,7 @@ export class NotificationService {
         title: savedNotification.title,
         message: savedNotification.message,
         type: savedNotification.type,
-        metadata: savedNotification.metadata,
+        metadata: savedNotification.metadata ?? undefined,
         createdAt: savedNotification.createdAt,
       };
       wsService.sendNotificationToUser(data.userId, wsPayload);
@@ -48,20 +47,15 @@ export class NotificationService {
     userId: string,
     page: number = 1,
     limit: number = 50
-  ): Promise<PaginatedResult<Notification> & { unreadCount: number }> {
+  ): Promise<NotificationsListResult> {
     const skip = getSkip(page, limit);
 
-    const [notifications, total] =
-      await this.notificationRepository.findAndCount({
-        where: { userId },
-        order: { createdAt: "DESC" },
-        take: limit,
-        skip,
-      });
-
-    const unreadCount = await this.notificationRepository.count({
-      where: { userId, isRead: false },
-    });
+    const [notifications, total] = await this.notificationRepo.findManyByUser(
+      userId,
+      skip,
+      limit
+    );
+    const unreadCount = await this.notificationRepo.countUnread(userId);
 
     return {
       ...buildPaginatedResult(notifications, total, page, limit),
@@ -70,32 +64,25 @@ export class NotificationService {
   }
 
   async markAsRead(notificationId: string, userId: string): Promise<void> {
-    const notification = await this.findOwnedOrThrow(notificationId, userId);
-
+    const notification = await this.getOwnedOrThrow(notificationId, userId);
     notification.isRead = true;
-    await this.notificationRepository.save(notification);
+    await this.notificationRepo.save(notification);
   }
 
   async markAllAsRead(userId: string): Promise<void> {
-    await this.notificationRepository.update(
-      { userId, isRead: false },
-      { isRead: true }
-    );
+    await this.notificationRepo.markAllAsRead(userId);
   }
 
   async deleteNotification(
     notificationId: string,
     userId: string
   ): Promise<void> {
-    const notification = await this.findOwnedOrThrow(notificationId, userId);
-
-    await this.notificationRepository.remove(notification);
+    const notification = await this.getOwnedOrThrow(notificationId, userId);
+    await this.notificationRepo.remove(notification);
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    return await this.notificationRepository.count({
-      where: { userId, isRead: false },
-    });
+    return this.notificationRepo.countUnread(userId);
   }
 
   async notifyApplicationStatusChanged(
@@ -115,7 +102,9 @@ export class NotificationService {
     await this.createNotification({
       userId: applicantId,
       title: "Application Status Updated",
-      message: `Your application for ${jobTitle} at ${companyName} ${statusMessages[newStatus] || "has been updated"}.`,
+      message: `Your application for ${jobTitle} at ${companyName} ${
+        statusMessages[newStatus] || "has been updated"
+      }.`,
       type: NotificationType.APPLICATION_STATUS_UPDATED,
       metadata: {
         applicationId,
@@ -143,25 +132,18 @@ export class NotificationService {
     });
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────
-
-  /**
-   * Dùng chung cho markAsRead/deleteNotification — cả hai đều cần
-   * tìm notification theo {id, userId} rồi throw NotFoundError nếu
-   * không thuộc user hoặc không tồn tại.
-   */
-  private async findOwnedOrThrow(
+  // ─── Helpers ───────────────────────────────────────────
+  private async getOwnedOrThrow(
     notificationId: string,
     userId: string
   ): Promise<Notification> {
-    const notification = await this.notificationRepository.findOne({
-      where: { id: notificationId, userId },
-    });
-
+    const notification = await this.notificationRepo.findByIdAndUser(
+      notificationId,
+      userId
+    );
     if (!notification) {
       throw new NotFoundError("Notification not found");
     }
-
     return notification;
   }
 }

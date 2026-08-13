@@ -25,7 +25,11 @@ import upload from "../middlewares/upload.middleware";
 const router = Router();
 
 // Public routes
-router.get("/", validate(getAllCompaniesSchema), getAllCompanies);
+router.get(
+  ROUTES.COMPANIES.LIST,
+  validate(getAllCompaniesSchema),
+  getAllCompanies
+);
 
 router.get(ROUTES.COMPANIES.MY, protect, getMyCompany);
 
@@ -42,7 +46,12 @@ router.get(
 );
 
 // Protected routes
-router.post("/", protect, validate(createCompanySchema), createCompany);
+router.post(
+  ROUTES.COMPANIES.LIST,
+  protect,
+  validate(createCompanySchema),
+  createCompany
+);
 
 router.put(
   ROUTES.COMPANIES.BY_ID,
@@ -51,7 +60,12 @@ router.put(
   updateCompany
 );
 
-router.delete(ROUTES.COMPANIES.BY_ID, protect, validate(getCompanyByIdSchema), deleteCompany);
+router.delete(
+  ROUTES.COMPANIES.BY_ID,
+  protect,
+  validate(getCompanyByIdSchema),
+  deleteCompany
+);
 
 router.post(
   ROUTES.COMPANIES.UPLOAD_LOGO,
