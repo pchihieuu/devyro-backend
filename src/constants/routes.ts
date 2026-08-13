@@ -70,6 +70,7 @@ export const ROUTES = {
   },
   COMPANIES: {
     BASE: "/companies",
+    LIST: "/",
     BY_ID: "/:id",
     MY: "/my",
     JOBS: "/:id/jobs",

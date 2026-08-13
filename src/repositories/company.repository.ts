@@ -1,6 +1,6 @@
 import { AppDataSource } from "../config/database.config";
 import { Company } from "../entities/Company.entity";
-import { Like } from "typeorm";
+import { FindOptionsWhere, Like } from "typeorm";
 import { PaginationOptions, getSkip } from "../utils/pagination.util";
 import { CompanyDetail, CompanySummary } from "../types/company.types";
 
@@ -18,8 +18,9 @@ const EMPLOYER_DETAIL_SELECT = {
   avatar: true,
 } as const;
 
-function buildCompanyWhere(filters: CompanyFilters) {
-  const where: any = {};
+type CompanyWritableFields = Omit<Company, "employer" | "jobs">;
+function buildCompanyWhere(filters: CompanyFilters): FindOptionsWhere<Company> {
+  const where: FindOptionsWhere<Company> = {};
   if (filters.keyword) where.name = Like(`%${filters.keyword}%`);
   if (filters.industry) where.industry = filters.industry;
   if (filters.size) where.size = filters.size;
@@ -31,7 +32,7 @@ export class CompanyRepository {
 
   // ---- write ops ----
 
-  create(data: Partial<Company>): Company {
+  create(data: Partial<CompanyWritableFields>): Company {
     return this.repo.create(data);
   }
 
@@ -47,7 +48,10 @@ export class CompanyRepository {
     await this.repo.softDelete(id);
   }
 
-  async update(id: string, data: Partial<Company>): Promise<void> {
+  async update(
+    id: string,
+    data: Partial<CompanyWritableFields>
+  ): Promise<void> {
     await this.repo.update(id, data);
   }
 
