@@ -1,7 +1,7 @@
 import { SavedJob } from "../entities/SavedJob.entity";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import {
-  PaginationOptions,
+  PaginatedResult,
   buildPaginatedResult,
 } from "../utils/pagination.util";
 import {
@@ -9,6 +9,7 @@ import {
   SavedJobRepository,
 } from "../repositories/savedJob.repository";
 import { jobRepository, JobRepository } from "../repositories/job.repository";
+import { GetMySavedJobsQuery } from "../validators/savedJob.validator";
 
 export class SavedJobService {
   constructor(
@@ -45,7 +46,7 @@ export class SavedJobService {
     await this.savedJobRepo.softDelete(jobId, jobseekerId);
   }
 
-  async getMySavedJobs(jobseekerId: string, pagination: PaginationOptions) {
+  async getMySavedJobs(jobseekerId: string, pagination: GetMySavedJobsQuery): Promise<PaginatedResult<SavedJob>> {
     const [savedJobs, total] = await this.savedJobRepo.findAndCountByJobseeker(
       jobseekerId,
       pagination
