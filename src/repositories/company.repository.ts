@@ -1,6 +1,6 @@
 import { AppDataSource } from "../config/database.config";
 import { Company } from "../entities/Company.entity";
-import { FindOptionsWhere, Like } from "typeorm";
+import { FindOptionsWhere, ILike } from "typeorm";
 import { PaginationOptions, getSkip } from "../utils/pagination.util";
 import { CompanyDetail, CompanySummary } from "../types/company.types";
 
@@ -21,7 +21,7 @@ const EMPLOYER_DETAIL_SELECT = {
 type CompanyWritableFields = Omit<Company, "employer" | "jobs">;
 function buildCompanyWhere(filters: CompanyFilters): FindOptionsWhere<Company> {
   const where: FindOptionsWhere<Company> = {};
-  if (filters.keyword) where.name = Like(`%${filters.keyword}%`);
+  if (filters.keyword) where.name = ILike(`%${filters.keyword}%`);
   if (filters.industry) where.industry = filters.industry;
   if (filters.size) where.size = filters.size;
   return where;
