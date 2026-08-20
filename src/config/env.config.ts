@@ -173,6 +173,6 @@ export const config: AppConfig = {
   },
   redis: {
     url: process.env.REDIS_URL as string,
-    tls: process.env.REDIS_TLS === "false",
+    tls: process.env.REDIS_TLS === "true",
   },
 };

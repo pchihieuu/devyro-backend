@@ -9,7 +9,7 @@ class RedisConnection {
       this.instance = new Redis(config.redis.url, {
         maxRetriesPerRequest: 3,
         retryStrategy: (times) => Math.min(times * 200, 2000),
-        ...(config.redis.tls ? { tls: { rejectUnauthorized: false } } : {}),
+        ...(config.redis.url.startsWith("rediss://") ? { tls: { rejectUnauthorized: false } } : {}),
       });
 
       this.instance.on("connect", () => console.log("[redis] connected"));
