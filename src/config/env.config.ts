@@ -62,6 +62,11 @@ interface RMQConfig {
   url: string;
 }
 
+interface RedisConfig {
+  url: string;
+  tls: boolean;
+}
+
 interface AppConfig {
   database: DatabaseConfig;
   jwt: JwtConfig;
@@ -69,6 +74,7 @@ interface AppConfig {
   email: EmailConfig;
   cors: CorsConfig;
   rmq: RMQConfig;
+  redis: RedisConfig;
   rateLimit: RateLimitConfig;
   api: ApiConfig;
   upload: UploadConfig;
@@ -87,6 +93,7 @@ const validateEnv = (): void => {
     "JWT_SECRET",
     "JWT_REFRESH_SECRET",
     "GEMINI_API_KEY",
+    "REDIS_URL",
   ];
   const missing = required.filter((key) => !process.env[key]);
 
@@ -135,7 +142,7 @@ export const config: AppConfig = {
     origin:
       process.env.CORS_ORIGIN ||
       process.env.CLIENT_URL ||
-      "https://https://devyro.vercel.app/",
+      "https://devyro.vercel.app/",
     credentials: true,
   },
   rateLimit: {
@@ -163,5 +170,9 @@ export const config: AppConfig = {
   cookieDomain: process.env.COOKIE_DOMAIN,
   rmq: {
     url: process.env.RABBITMQ_URL as string,
+  },
+  redis: {
+    url: process.env.REDIS_URL as string,
+    tls: process.env.REDIS_TLS === "false",
   },
 };

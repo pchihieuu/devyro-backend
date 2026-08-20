@@ -7,7 +7,6 @@ import { SavedJob } from "../entities/SavedJob.entity";
 import { Analytics } from "../entities/Analytics.entity";
 import { Company } from "../entities/Company.entity";
 import { Notification } from "../entities/Notification.entity";
-import { RefreshToken } from "../entities/Refreshtoken.entity";
 import { PasswordResetToken } from "../entities/Passwordresettoken.entity";
 import { Message } from "../entities/Message.entity";
 import { Conversation } from "../entities/Conversation.entity";
@@ -55,7 +54,6 @@ const developmentConfig: DataSourceOptions = {
     Analytics,
     Company,
     Notification,
-    RefreshToken,
     PasswordResetToken,
     Message,
     Conversation,

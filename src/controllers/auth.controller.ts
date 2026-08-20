@@ -144,7 +144,7 @@ export const logout = asyncHandler(
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken && req.user) {
-      await authService.logout(req.user.id, refreshToken);
+      await authService.logout(req.user.id, refreshToken, req.tokenPayload);
     }
 
     clearRefreshTokenCookie(res);

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database.config";
 import { User } from "../entities/User.entity";
 import { verifyAccessToken } from "../utils/token.utils";
+import { sessionRepository } from "../repositories/session.repository";
 
 export const protect = async (
   req: Request,
@@ -10,41 +11,67 @@ export const protect = async (
 ): Promise<void> => {
   try {
     let token = req.headers.authorization;
-
     if (!token || !token.startsWith("Bearer")) {
+      res
+        .status(401)
+        .json({ success: false, message: "Not authorized, no token provided" });
+      return;
+    }
+    token = token.split(" ")[1];
+
+    const decoded = verifyAccessToken(token); // JwtPayload: { id, email, role, jti, iat, exp }
+
+    if (
+      decoded.jti &&
+      (await sessionRepository.isAccessTokenBlacklisted(decoded.jti))
+    ) {
       res.status(401).json({
         success: false,
-        message: "Not authorized, no token provided",
+        message: "Access token đã bị thu hồi",
+        code: "TOKEN_REVOKED",
       });
       return;
     }
 
-    token = token.split(" ")[1];
-
-    // Verify access token
-    const decoded = verifyAccessToken(token);
-
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: decoded.id },
-      select: [
-        "id",
-        "name",
-        "email",
-        "role",
-        "avatar",
-        "resume",
-        "createdAt",
-        "updatedAt",
-      ],
-    });
-
-    if (!user) {
+    if (
+      decoded.iat &&
+      (await sessionRepository.isTokenIssuedBeforeInvalidation(
+        decoded.id,
+        decoded.iat
+      ))
+    ) {
       res.status(401).json({
         success: false,
-        message: "User not found",
+        message: "Phiên đăng nhập đã hết hiệu lực",
+        code: "SESSION_INVALIDATED",
       });
       return;
+    }
+
+    req.tokenPayload = decoded; // để logout controller tái dùng
+
+    let user = await sessionRepository.getCachedUserSession<User>(decoded.id);
+
+    if (!user) {
+      const userRepository = AppDataSource.getRepository(User);
+      user = await userRepository.findOne({
+        where: { id: decoded.id },
+        select: [
+          "id",
+          "name",
+          "email",
+          "role",
+          "avatar",
+          "resume",
+          "createdAt",
+          "updatedAt",
+        ],
+      });
+      if (!user) {
+        res.status(401).json({ success: false, message: "User not found" });
+        return;
+      }
+      await sessionRepository.cacheUserSession(decoded.id, user);
     }
 
     req.user = user;
@@ -67,7 +94,6 @@ export const protect = async (
     });
   }
 };
-
 
 export const optionalAuth = async (
   req: Request,
