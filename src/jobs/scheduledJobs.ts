@@ -10,9 +10,7 @@ export const setupScheduledJobs = () => {
     console.log("Running scheduled cleanup job for expired tokens...");
     
     try {
-      // Clean up expired refresh tokens
-      await authService.cleanupExpiredTokens();
-      console.log("Expired refresh tokens cleaned up successfully");
+      // Refresh session (Redis) tự hết hạn qua TTL — không cần cron dọn nữa.
 
       // Clean up expired password reset tokens
       await authService.cleanupExpiredResetTokens();
