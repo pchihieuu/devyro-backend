@@ -5,6 +5,7 @@ declare global {
     interface Request {
       user?: User;
       // Kết quả sau khi Zod parse + transform (page/limit thành number, index thành number...)
+      tokenPayload?: JwtPayload;
       validatedQuery?: Record<string, any>;
       validatedParams?: Record<string, any>;
     }
@@ -31,6 +32,11 @@ export type ValidatedRequest<
 
 export interface JwtPayload {
   id: string;
+  email: string;
+  role: string;
+  jti?: string;   // chỉ có ở access token (thêm qua generateAccessToken)
+  iat?: number;   // jwt tự thêm khi sign
+  exp?: number;   // jwt tự thêm khi sign
 }
 
 export interface PaginationQuery {
