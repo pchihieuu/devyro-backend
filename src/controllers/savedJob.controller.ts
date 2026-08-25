@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HTTP_STATUS } from "../constants/httpStatus";
 import { savedJobService } from "../services/savedJob.service";

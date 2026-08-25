@@ -1,4 +1,5 @@
-import amqplib, { Channel, ChannelModel, Options } from "amqplib";
+import amqplib, { Channel, ChannelModel } from "amqplib";
+import { config } from './../config/env.config';
 
 export enum QueueName {
   GROUP_MESSAGE = "group.message",
@@ -65,7 +66,7 @@ class MessageQueueService {
     this.isConnecting = true;
 
     try {
-      const url = process.env.RABBITMQ_URL as string;
+      const url = config.rmq.url
       if (!url) throw new Error("RABBITMQ_URL is not set");
 
       this.connection = await amqplib.connect(url);
