@@ -1,14 +1,13 @@
 import { emailConfig } from "../config/email.config";
 import { config } from "../config/env.config";
-import {
-  EmailTemplates
-} from "../templates/email.templates";
+import { EmailAttachment, EmailTemplates } from "../templates/email.templates";
 
 export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
   text: string;
+  attachments?: EmailAttachment[];
 }
 
 class EmailService {
@@ -35,6 +34,7 @@ class EmailService {
       subject: options.subject,
       html: options.html,
       text: options.text,
+      attachments: options.attachments,
     };
 
     try {
@@ -54,13 +54,17 @@ class EmailService {
    * Send welcome email to new users
    */
   public async sendWelcomeEmail(to: string, name: string): Promise<void> {
-    const { html, text } = EmailTemplates.welcome({ name, email: to });
+    const { html, text, attachments } = EmailTemplates.welcome({
+      name,
+      email: to,
+    });
 
     await this.sendEmail({
       to,
-      subject: `Welcome to JobPortal, ${name}! 🎉`,
+      subject: `Welcome to Devyro, ${name}`,
       html,
       text,
+      attachments,
     });
   }
 
@@ -72,7 +76,7 @@ class EmailService {
     name: string,
     resetToken: string
   ): Promise<void> {
-    const { html, text } = EmailTemplates.passwordReset({
+    const { html, text, attachments } = EmailTemplates.passwordReset({
       name,
       email: to,
       token: resetToken,
@@ -80,9 +84,10 @@ class EmailService {
 
     await this.sendEmail({
       to,
-      subject: "Reset Your Password - JobPortal",
+      subject: "Reset Your Password - Devyro",
       html,
       text,
+      attachments,
     });
   }
 
@@ -93,7 +98,7 @@ class EmailService {
     to: string,
     name: string
   ): Promise<void> {
-    const { html, text } = EmailTemplates.passwordChanged({
+    const { html, text, attachments } = EmailTemplates.passwordChanged({
       name,
       email: to,
       date: new Date().toLocaleString("en-US", {
@@ -109,9 +114,10 @@ class EmailService {
 
     await this.sendEmail({
       to,
-      subject: "Your Password Has Been Changed - JobPortal",
+      subject: "Your Password Has Been Changed - Devyro",
       html,
       text,
+      attachments,
     });
   }
 

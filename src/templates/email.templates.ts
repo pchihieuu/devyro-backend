@@ -1,3 +1,4 @@
+import path from "path";
 import { config } from "../config/env.config";
 
 export interface EmailTemplateData {
@@ -8,156 +9,230 @@ export interface EmailTemplateData {
   date?: string;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  path: string;
+  cid: string;
+}
+
+export interface EmailTemplateResult {
+  subject: string;
+  html: string;
+  text: string;
+  attachments: EmailAttachment[];
+}
+
+export class EmailAssets {
+  public static readonly WELCOME_BANNER_CID = "welcome-banner";
+  public static readonly PASSWORD_RESET_BANNER_CID = "password-reset-banner";
+  public static readonly PASSWORD_CHANGE_BANNER_CID = "password-change-banner";
+
+  public static readonly WELCOME_BANNER_PATH = path.join(
+    __dirname,
+    "../../docs/assets/email/welcome.png"
+  );
+  public static readonly PASSWORD_RESET_BANNER_PATH = path.join(
+    __dirname,
+    "../../docs/assets/email/password-reset.png"
+  );
+  public static readonly PASSWORD_CHANGE_BANNER_PATH = path.join(
+    __dirname,
+    "../../docs/assets/email/password-changed.png"
+  );
+}
+
 export class EmailTemplates {
-  private static readonly BRAND_COLOR = "#667eea";
-  private static readonly SUCCESS_COLOR = "#10b981";
-  private static readonly WARNING_COLOR = "#ffc107";
-  private static readonly DANGER_COLOR = "#ef4444";
+  private static readonly BRAND_COLOR = "#6d28d9";
+  private static readonly SUCCESS_COLOR = "#059669";
+  private static readonly WARNING_COLOR = "#d97706";
+  private static readonly WARNING_BG = "#fffbeb";
+  private static readonly DANGER_COLOR = "#dc2626";
+  private static readonly DANGER_BG = "#fef2f2";
+  private static readonly DANGER_BORDER = "#ef4444";
+  private static readonly INFO_BG = "#f5f3ff";
+  private static readonly SUCCESS_BG = "#ecfdf5";
+  private static readonly TEXT_HEADING = "#1a1a1a";
+  private static readonly TEXT_BODY = "#3f3f46";
+  private static readonly TEXT_MUTED = "#9ca3af";
+  private static readonly BORDER_COLOR = "#e5e7eb";
+  private static readonly LINK_COLOR = "#2563eb";
 
   /**
-   * Base HTML template wrapper
+   * One attachment definition per banner. Each template method picks the
+   * single entry it needs (via `bannerAttachment`) instead of shipping
+   * every banner with every email.
    */
-  private static baseTemplate(
-    content: string,
-    headerBg: string = this.BRAND_COLOR
-  ): string {
+  private static readonly BANNER_ATTACHMENTS: Record<string, EmailAttachment> =
+    {
+      welcome: {
+        filename: "welcome-banner.png",
+        path: EmailAssets.WELCOME_BANNER_PATH,
+        cid: EmailAssets.WELCOME_BANNER_CID,
+      },
+      passwordReset: {
+        filename: "password-reset-banner.png",
+        path: EmailAssets.PASSWORD_RESET_BANNER_PATH,
+        cid: EmailAssets.PASSWORD_RESET_BANNER_CID,
+      },
+      passwordChanged: {
+        filename: "password-change-banner.png",
+        path: EmailAssets.PASSWORD_CHANGE_BANNER_PATH,
+        cid: EmailAssets.PASSWORD_CHANGE_BANNER_CID,
+      },
+    };
+
+  /** Returns the single-item attachment list for a given banner key. */
+  private static bannerAttachment(
+    key: keyof typeof EmailTemplates.BANNER_ATTACHMENTS
+  ): EmailAttachment[] {
+    return [this.BANNER_ATTACHMENTS[key]];
+  }
+
+  private static baseTemplate(options: {
+    bannerCid?: string;
+    heading: string;
+    body: string;
+  }): string {
+    const {
+      bannerCid = EmailAssets.WELCOME_BANNER_CID,
+      heading,
+      body,
+    } = options;
+
     return `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="X-UA-Compatible" content="IE=edge">
+          <title>Devyro</title>
           <style>
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f5f5f5;
-            }
-            .container {
-              background-color: #ffffff;
-              border-radius: 10px;
-              overflow: hidden;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-              background: ${headerBg};
-              color: white;
-              padding: 40px 30px;
-              text-align: center;
-            }
-            .header h1 {
               margin: 0;
-              font-size: 28px;
-              font-weight: 600;
+              padding: 0;
+              background-color: #f4f4f5;
+              font-family: Arial, Helvetica, sans-serif;
+              color: ${this.TEXT_BODY};
             }
+            .email-outer {
+              width: 100%;
+              background-color: #f4f4f5;
+              padding: 40px 16px;
+            }
+            .email-wrapper {
+              max-width: 760px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              border: 1px solid ${this.BORDER_COLOR};
+            }
+            /* ==== Top banner image ==== */
+            .banner {
+              width: 100%;
+              line-height: 0;
+            }
+            .banner img {
+              width: 100%;
+              height: auto;
+              display: block;
+            }
+            /* ==== Content block ==== */
             .content {
-              padding: 40px 30px;
+              padding: 48px 56px 8px;
             }
-            .content h2 {
-              color: #333;
-              font-size: 24px;
-              margin-top: 0;
-              margin-bottom: 20px;
+            .content h1.heading {
+              font-family: 'Times New Roman', Times, Georgia, serif;
+              font-size: 38px;
+              line-height: 1.25;
+              font-weight: 700;
+              color: ${this.TEXT_HEADING};
+              margin: 0 0 28px;
             }
             .content p {
-              margin: 15px 0;
-              color: #555;
+              font-family: "Inter", sans-serif;
+              font-size: 18px;
+              line-height: 1.8;
+              color: ${this.TEXT_BODY};
+              margin: 0 0 22px;
+            }
+            .content a {
+              color: ${this.LINK_COLOR};
+              text-decoration: underline;
+            }
+            .content ul {
+              font-family: "Inter", sans-serif;
+              padding-left: 22px;
+              margin: 0 0 22px;
+            }
+            .content ul li {
+              font-size: 17px;
+              line-height: 1.8;
+              color: ${this.TEXT_BODY};
+              margin: 10px 0;
             }
             .button {
               display: inline-block;
-              padding: 14px 32px;
+              padding: 16px 40px;
               background: ${this.BRAND_COLOR};
-              color: white;
-              text-decoration: none;
+              color: #ffffff !important;
+              text-decoration: none !important;
               border-radius: 6px;
-              margin: 25px 0;
-              font-weight: 600;
+              font-family: "Inter", sans-serif;
+              font-weight: bold;
+              font-size: 17px;
+            }
+            .button-wrap {
               text-align: center;
+              margin: 8px 0 32px;
             }
-            .button:hover {
-              background: #5568d3;
+            .box {
+              padding: 22px 24px;
+              margin: 0 0 28px;
+              border-radius: 6px;
+              border: 1px solid transparent;
+              text-align: left;
+              font-family: "Inter", sans-serif;
             }
-            .info-box {
-              background: #f8f9fa;
-              border-left: 4px solid ${this.BRAND_COLOR};
-              padding: 20px;
-              margin: 25px 0;
-              border-radius: 4px;
-            }
-            .warning-box {
-              background: #fff3cd;
-              border-left: 4px solid ${this.WARNING_COLOR};
-              padding: 20px;
-              margin: 25px 0;
-              border-radius: 4px;
-            }
-            .success-box {
-              background: #d1fae5;
-              border-left: 4px solid ${this.SUCCESS_COLOR};
-              padding: 20px;
-              margin: 25px 0;
-              border-radius: 4px;
-            }
-            .danger-box {
-              background: #fee2e2;
-              border-left: 4px solid ${this.DANGER_COLOR};
-              padding: 20px;
-              margin: 25px 0;
-              border-radius: 4px;
-            }
-            .footer {
-              background: #f8f9fa;
-              padding: 30px;
-              text-align: center;
-              color: #666;
-              font-size: 14px;
-              border-top: 1px solid #e9ecef;
-            }
-            .footer p {
-              margin: 8px 0;
-            }
-            ul {
-              padding-left: 20px;
-            }
-            ul li {
-              margin: 10px 0;
-              color: #555;
-            }
-            .token-display {
-              background: white;
-              border: 2px dashed ${this.BRAND_COLOR};
-              padding: 20px;
-              margin: 20px 0;
-              text-align: center;
-              font-family: monospace;
+            .box-title {
+              font-weight: bold;
               font-size: 16px;
-              word-break: break-all;
-              border-radius: 4px;
+              margin: 0 0 10px;
             }
-            @media only screen and (max-width: 600px) {
-              body {
-                padding: 10px;
-              }
-              .header {
-                padding: 30px 20px;
-              }
-              .content {
-                padding: 30px 20px;
-              }
-              .button {
-                display: block;
-                padding: 12px 20px;
-              }
+            .box p, .box ul li { font-size: 16px; margin: 6px 0; }
+            .box ul { margin: 10px 0 0; padding-left: 20px; }
+            .info-box { background: ${this.INFO_BG};}
+            .info-box .box-title { color: ${this.BRAND_COLOR}; }
+            .warning-box { background: ${this.WARNING_BG}; }
+            .warning-box .box-title { color: ${this.WARNING_COLOR}; }
+            .success-box { background: ${this.SUCCESS_BG}; }
+            .success-box .box-title { color: ${this.SUCCESS_COLOR}; }
+            .danger-box { background: ${this.DANGER_BG};}
+            .danger-box .box-title { color: ${this.DANGER_COLOR}; }
+            .token-display {
+              background: #f9fafb;
+              border: 1.5px dashed #ddd6fe;
+              padding: 16px;
+              margin: 0 0 28px;
+              text-align: center;
+              font-family: "Inter", sans-serif;
+              font-size: 14px;
+              color: ${this.BRAND_COLOR};
+              word-break: break-all;
+              border-radius: 6px;
             }
           </style>
         </head>
         <body>
-          <div class="container">
-            ${content}
+          <div class="email-outer">
+            <div class="email-wrapper">
+              <div class="banner">
+                <img src="cid:${bannerCid}" alt="Devyro" />
+              </div>
+              <div class="content">
+                <h1 class="heading">${heading}</h1>
+                ${body}
+              </div>
+            </div>
           </div>
         </body>
       </html>
@@ -165,262 +240,176 @@ export class EmailTemplates {
   }
 
   /**
-   * Welcome email template
+   * Welcome email — sent right after registration.
    */
-  public static welcome(data: EmailTemplateData): {
-    html: string;
-    text: string;
-  } {
-    const content = `
-      <div class="header">
-        <h1>🎉 Welcome to JobPortal!</h1>
+  public static welcome(data: EmailTemplateData): EmailTemplateResult {
+    const body = `
+      <p>Welcome aboard! We're thrilled to have you join the Devyro community. Your account has been created successfully and you're all set to start your job search journey.</p>
+
+      <p>Most welcome emails spend their time telling you how great the company is. We think so too — but what matters more is helping you find the right job, fast.</p>
+
+      <div class="button-wrap">
+        <a href="${config.frontendUrl}/jobs" class="button">Explore Jobs Now</a>
       </div>
-      <div class="content">
-        <h2>Hello ${data.name},</h2>
-        <p>Thank you for joining JobPortal! We're thrilled to have you as part of our community.</p>
-        
-        <p>Your account has been successfully created and you're ready to start your journey with us.</p>
-        
-        <div class="info-box">
-          <p><strong>What you can do now:</strong></p>
-          <ul>
-            <li>Browse thousands of job opportunities</li>
-            <li>Create and customize your profile</li>
-            <li>Upload your resume and portfolio</li>
-            <li>Apply to jobs with one click</li>
-            <li>Save jobs for later review</li>
-            <li>Track your application status</li>
-          </ul>
-        </div>
-        
-        <p style="text-align: center;">
-          <a href="${config.frontendUrl}/jobs" class="button">Explore Jobs Now</a>
-        </p>
-        
-        <p>If you have any questions or need assistance, our support team is always here to help.</p>
-        
-        <p>Best regards,<br>The JobPortal Team</p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to <strong>${data.email}</strong></p>
-        <p>If you didn't create this account, please ignore this email.</p>
-        <p>&copy; ${new Date().getFullYear()} JobPortal. All rights reserved.</p>
-      </div>
+
+      <p>If you have any questions, our support team is always happy to help.<br>Best regards,<br>The Devyro Team</p>
     `;
 
+    const html = this.baseTemplate({
+      bannerCid: EmailAssets.WELCOME_BANNER_CID,
+      heading: `Hello, ${data.name}`,
+      body,
+    });
+
     const text = `
-Welcome to JobPortal!
+Hello, ${data.name}
 
-Hello ${data.name},
+Welcome aboard! We're thrilled to have you join the Devyro community. Your account has been created successfully and you're all set to start your job search journey.
 
-Thank you for joining JobPortal! We're thrilled to have you as part of our community.
-
-Your account has been successfully created and you're ready to start your journey with us.
-
-What you can do now:
-- Browse thousands of job opportunities
-- Create and customize your profile
-- Upload your resume and portfolio
-- Apply to jobs with one click
-- Save jobs for later review
-- Track your application status
+Most welcome emails spend their time telling you how great the company is. We think so too — but what matters more is helping you find the right job, fast.
 
 Get started: ${config.frontendUrl}/jobs
 
-If you have any questions or need assistance, our support team is always here to help.
-
+If you have any questions, our support team is always happy to help.
 Best regards,
-The JobPortal Team
-
----
-This email was sent to ${data.email}
-If you didn't create this account, please ignore this email.
-© ${new Date().getFullYear()} JobPortal. All rights reserved.
-    `;
+The Devyro Team`;
 
     return {
-      html: this.baseTemplate(content),
+      subject: "Welcome to Devyro!",
+      html,
       text: text.trim(),
+      attachments: this.bannerAttachment("welcome"),
     };
   }
 
   /**
-   * Password reset email template
+   * Password reset email — sent for the "forgot password" flow.
    */
-  public static passwordReset(data: EmailTemplateData): {
-    html: string;
-    text: string;
-  } {
+  public static passwordReset(data: EmailTemplateData): EmailTemplateResult {
     const resetUrl = `${config.frontendUrl}/reset-password?token=${data.token}`;
 
-    const content = `
-      <div class="header">
-        <h1>🔐 Password Reset Request</h1>
+    const body = `
+      <p>We received a request to reset the password for your Devyro account. Click the button below to set a new one.</p>
+
+      <div class="button-wrap">
+        <a href="${resetUrl}" class="button">Reset Your Password</a>
       </div>
-      <div class="content">
-        <h2>Hello ${data.name},</h2>
-        <p>We received a request to reset your password for your JobPortal account.</p>
-        
-        <p>Click the button below to create a new password:</p>
-        
-        <p style="text-align: center;">
-          <a href="${resetUrl}" class="button">Reset Your Password</a>
-        </p>
-        
-        <p>Or copy and paste this link into your browser:</p>
-        <div class="token-display">${resetUrl}</div>
-        
-        <div class="warning-box">
-          <p><strong>⚠️ Important Security Information:</strong></p>
-          <ul>
-            <li>This link will <strong>expire in 1 hour</strong></li>
-            <li>The link can only be used <strong>once</strong></li>
-            <li>If you didn't request this reset, please ignore this email</li>
-            <li>Your password will remain unchanged until you create a new one</li>
-          </ul>
-        </div>
-        
-        <p>For your security, this link will automatically expire after one use or one hour, whichever comes first.</p>
-        
-        <div class="info-box">
-          <p><strong>Need help?</strong></p>
-          <p>If you're having trouble resetting your password or didn't request this change, please contact our support team immediately.</p>
-        </div>
-        
-        <p>Best regards,<br>The JobPortal Security Team</p>
+
+      <p style="font-size: 14px; color: ${this.TEXT_MUTED};">Or copy and paste this link into your browser:</p>
+      <div class="token-display">${resetUrl}</div>
+
+      <div class="box warning-box">
+        <p class="box-title">Important security information</p>
+        <ul>
+          <li>This link will <strong>expire in 1 hour</strong></li>
+          <li>The link can only be used <strong>once</strong></li>
+          <li>If you didn't request this, you can safely ignore this email</li>
+          <li>Your password stays the same until you set a new one</li>
+        </ul>
       </div>
-      <div class="footer">
-        <p>This email was sent to <strong>${data.email}</strong></p>
-        <p>If you didn't request a password reset, you can safely ignore this email.</p>
-        <p>&copy; ${new Date().getFullYear()} JobPortal. All rights reserved.</p>
-      </div>
+
+      <p>If you're having trouble or didn't request this change, please contact our support team right away.<br>Best regards,<br>The Devyro Security Team</p>
     `;
+
+    const html = this.baseTemplate({
+      bannerCid: EmailAssets.PASSWORD_RESET_BANNER_CID,
+      heading: `Hello, ${data.name}`,
+      body,
+    });
 
     const text = `
-Password Reset Request
+Hello, ${data.name}!
 
-Hello ${data.name},
+We received a request to reset the password for your Devyro account.
 
-We received a request to reset your password for your JobPortal account.
-
-Reset your password by visiting this link:
+Reset your password using this link:
 ${resetUrl}
 
-⚠️ Important Security Information:
+Important security information:
 - This link will expire in 1 hour
 - The link can only be used once
-- If you didn't request this reset, please ignore this email
-- Your password will remain unchanged until you create a new one
+- If you didn't request this, you can safely ignore this email
+- Your password stays the same until you set a new one
 
-For your security, this link will automatically expire after one use or one hour, whichever comes first.
-
-Need help?
-If you're having trouble resetting your password or didn't request this change, please contact our support team immediately.
-
+If you're having trouble or didn't request this change, please contact our support team right away.
 Best regards,
-The JobPortal Security Team
-
----
-This email was sent to ${data.email}
-If you didn't request a password reset, you can safely ignore this email.
-© ${new Date().getFullYear()} JobPortal. All rights reserved.
-    `;
+The Devyro Security Team`;
 
     return {
-      html: this.baseTemplate(content),
+      subject: "Reset Your Password",
+      html,
       text: text.trim(),
+      attachments: this.bannerAttachment("passwordReset"),
     };
   }
 
   /**
-   * Password changed confirmation email template
+   * Password changed confirmation email.
    */
-  public static passwordChanged(data: EmailTemplateData): {
-    html: string;
-    text: string;
-  } {
-    const content = `
-      <div class="header" style="background: ${this.SUCCESS_COLOR};">
-        <h1>✓ Password Changed Successfully</h1>
+  public static passwordChanged(data: EmailTemplateData): EmailTemplateResult {
+    const body = `
+      <div class="box success-box">
+        <p class="box-title">Your password has been changed successfully</p>
+        <p><strong>Date:</strong> ${data.date || new Date().toLocaleString()}</p>
       </div>
-      <div class="content">
-        <h2>Hello ${data.name},</h2>
-        
-        <div class="success-box">
-          <p><strong>Your password has been successfully changed.</strong></p>
-          <p><strong>Date:</strong> ${data.date || new Date().toLocaleString()}</p>
-        </div>
-        
-        <p>This is a confirmation that the password for your account <strong>${data.email}</strong> has been changed.</p>
-        
-        <p>If you made this change, no further action is required. You can now log in with your new password.</p>
-        
-        <div class="danger-box">
-          <p><strong>⚠️ Didn't make this change?</strong></p>
-          <p>If you did not change your password, your account may be compromised. Please take the following actions immediately:</p>
-          <ul>
-            <li>Reset your password right away</li>
-            <li>Review your recent account activity</li>
-            <li>Contact our support team at <strong>support@jobportal.com</strong></li>
-          </ul>
-        </div>
-        
-        <div class="info-box">
-          <p><strong>Security Tips:</strong></p>
-          <ul>
-            <li>Use a strong, unique password</li>
-            <li>Don't share your password with anyone</li>
-            <li>Enable two-factor authentication if available</li>
-            <li>Regularly update your password</li>
-          </ul>
-        </div>
-        
-        <p>Best regards,<br>The JobPortal Security Team</p>
+
+      <p>This confirms that the password for your account <strong>${data.email}</strong> has been changed. If you made this change, no further action is needed — you can log in with your new password right away.</p>
+
+      <div class="box danger-box">
+        <p class="box-title">Didn't make this change?</p>
+        <p>Your account may have been compromised. Please act immediately:</p>
+        <ul>
+          <li>Reset your password right away</li>
+          <li>Review your recent account activity</li>
+          <li>Contact our support team at <strong>support@Devyro.com</strong></li>
+        </ul>
       </div>
-      <div class="footer">
-        <p>This email was sent to <strong>${data.email}</strong></p>
-        <p>For security reasons, this notification cannot be disabled.</p>
-        <p>&copy; ${new Date().getFullYear()} JobPortal. All rights reserved.</p>
+
+      <div class="box info-box">
+        <p class="box-title">Security tips</p>
+        <ul>
+          <li>Use a strong, unique password</li>
+          <li>Never share your password with anyone</li>
+          <li>Enable two-factor authentication if available</li>
+        </ul>
       </div>
+
+      <p>Best regards,<br>The Devyro Security Team</p>
     `;
+
+    const html = this.baseTemplate({
+      bannerCid: EmailAssets.PASSWORD_CHANGE_BANNER_CID,
+      heading: `All Set, ${data.name}`,
+      body,
+    });
 
     const text = `
-Password Changed Successfully
+All set, ${data.name}
 
-Hello ${data.name},
-
-✓ Your password has been successfully changed.
-
+Your password has been changed successfully.
 Date: ${data.date || new Date().toLocaleString()}
 
-This is a confirmation that the password for your account ${data.email} has been changed.
+This confirms that the password for your account ${data.email} has been changed. If you made this change, no further action is needed.
 
-If you made this change, no further action is required. You can now log in with your new password.
-
-⚠️ Didn't make this change?
-If you did not change your password, your account may be compromised. Please take the following actions immediately:
+Didn't make this change?
+Your account may have been compromised. Please act immediately:
 - Reset your password right away
 - Review your recent account activity
-- Contact our support team at support@jobportal.com
+- Contact our support team at support@Devyro.com
 
-Security Tips:
+Security tips:
 - Use a strong, unique password
-- Don't share your password with anyone
+- Never share your password with anyone
 - Enable two-factor authentication if available
-- Regularly update your password
 
 Best regards,
-The JobPortal Security Team
-
----
-This email was sent to ${data.email}
-For security reasons, this notification cannot be disabled.
-© ${new Date().getFullYear()} JobPortal. All rights reserved.
-    `;
+The Devyro Security Team `;
 
     return {
-      html: this.baseTemplate(content, this.SUCCESS_COLOR),
+      subject: "Password Changed Successfully",
+      html,
       text: text.trim(),
+      attachments: this.bannerAttachment("passwordChanged"),
     };
   }
 }
