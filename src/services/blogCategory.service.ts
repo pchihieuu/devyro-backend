@@ -1,37 +1,64 @@
-import { AppDataSource } from "../config/database.config";
+import slugify from "slugify";
+import {
+  BlogCategoryRepository,
+  blogCategoryRepository,
+} from "../repositories/blogCategory.repository";
 import { BlogCategory } from "../entities/BlogCategory.entity";
 import { ConflictError, NotFoundError } from "../utils/errors";
-import slugify from "slugify";
+import {
+  CreateCategoryBody,
+  UpdateCategoryBody,
+} from "../validators/blog.validator";
+import {
+  blogRepository,
+  BlogRepository,
+} from "../repositories/blog.repository";
 
 export class BlogCategoryService {
-  private repo = AppDataSource.getRepository(BlogCategory);
+  constructor(
+    private readonly categoryRepo: BlogCategoryRepository = blogCategoryRepository,
+    private readonly blogRepo: BlogRepository = blogRepository
+  ) {}
 
-  async list() {
-    return this.repo.find({ where: { isActive: true }, order: { name: "ASC" } });
+  async list(): Promise<BlogCategory[]> {
+    return this.categoryRepo.findActive();
   }
 
-  async create(data: { name: string; description?: string; type: any }) {
+  async adminList(): Promise<BlogCategory[]> {
+    return this.categoryRepo.findAll();
+  }
+
+  async create(data: CreateCategoryBody): Promise<BlogCategory> {
     const slug = slugify(data.name, { lower: true, strict: true });
-    const exists = await this.repo.findOne({ where: { slug } });
+    const exists = await this.categoryRepo.findBySlug(slug);
     if (exists) throw new ConflictError("Category already exists");
 
-    const cat = this.repo.create({ ...data, slug });
-    return this.repo.save(cat);
+    return this.categoryRepo.create({ ...data, slug });
   }
 
-  async update(id: string, data: Partial<{ name: string; description: string; isActive: boolean }>) {
-    const cat = await this.repo.findOne({ where: { id } });
+  async update(id: string, data: UpdateCategoryBody): Promise<BlogCategory> {
+    const cat = await this.categoryRepo.findById(id);
     if (!cat) throw new NotFoundError("Category not found");
+
     Object.assign(cat, data);
     if (data.name) cat.slug = slugify(data.name, { lower: true, strict: true });
-    return this.repo.save(cat);
+    return this.categoryRepo.save(cat);
   }
 
-  async delete(id: string) {
-    const cat = await this.repo.findOne({ where: { id } });
+  async delete(id: string): Promise<{ action: "deleted" | "deactivated" }> {
+    const cat = await this.categoryRepo.findById(id);
     if (!cat) throw new NotFoundError("Category not found");
-    await this.repo.remove(cat);
+
+    const postCount = await this.blogRepo.countByCategory(id);
+    if (postCount > 0) {
+      if (cat.isActive) {
+        cat.isActive = false;
+        await this.categoryRepo.save(cat);
+      }
+      return { action: "deactivated" };
+    }
+    await this.categoryRepo.remove(cat);
+    return { action: "deleted" };
   }
 }
-
 export const blogCategoryService = new BlogCategoryService();

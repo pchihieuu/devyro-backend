@@ -18,12 +18,19 @@ import {
   updateCategory,
   deleteCategory,
   getPostById,
+  adminListCategories,
 } from "../controllers/blog.controller";
 import {
   createPostSchema,
   updatePostSchema,
   listPostsSchema,
   createCategorySchema,
+  latestPostsSchema,
+  postIdParamSchema,
+  getBySlugSchema,
+  adminListPostsSchema,
+  updateCategorySchema,
+  categoryIdParamSchema,
 } from "../validators/blog.validator";
 import { ROUTES } from "../constants/routes";
 
@@ -31,14 +38,33 @@ const router = Router();
 
 // Public
 router.get("/", validate(listPostsSchema), listPosts);
-router.get(ROUTES.BLOGS.LATEST, getLatestPosts);
+router.get(ROUTES.BLOGS.LATEST, validate(latestPostsSchema), getLatestPosts);
 router.get(ROUTES.BLOGS.CATEGORIES, listCategories);
-router.get(ROUTES.BLOGS.RELATED, getRelatedPosts);
-router.get(ROUTES.BLOGS.BY_SLUG, getPost);
+router.get(ROUTES.BLOGS.RELATED, validate(postIdParamSchema), getRelatedPosts);
+router.get(ROUTES.BLOGS.BY_SLUG, validate(getBySlugSchema), getPost);
 
 // Admin
-router.get(ROUTES.BLOGS.ADMIN.POSTS, protect, adminOnly, adminListPosts);
-router.get(ROUTES.BLOGS.ADMIN.POST_BY_ID, protect, adminOnly, getPostById);
+router.get(
+  ROUTES.BLOGS.ADMIN.POSTS,
+  protect,
+  adminOnly,
+  validate(adminListPostsSchema),
+  adminListPosts
+);
+router.get(
+  ROUTES.BLOGS.ADMIN.POST_BY_ID,
+  protect,
+  adminOnly,
+  validate(postIdParamSchema),
+  getPostById
+);
+
+router.get(
+  ROUTES.BLOGS.ADMIN.CATEGORIES,
+  protect,
+  adminOnly,
+  adminListCategories
+);
 
 router.post(
   ROUTES.BLOGS.ADMIN.UPLOAD_IMAGE,
@@ -62,7 +88,13 @@ router.put(
   validate(updatePostSchema),
   updatePost
 );
-router.delete(ROUTES.BLOGS.ADMIN.POST_BY_ID, protect, adminOnly, deletePost);
+router.delete(
+  ROUTES.BLOGS.ADMIN.POST_BY_ID,
+  protect,
+  adminOnly,
+  validate(postIdParamSchema),
+  deletePost
+);
 
 router.post(
   ROUTES.BLOGS.ADMIN.CATEGORIES,
@@ -75,12 +107,14 @@ router.put(
   ROUTES.BLOGS.ADMIN.CATEGORY_BY_ID,
   protect,
   adminOnly,
+  validate(updateCategorySchema),
   updateCategory
 );
 router.delete(
   ROUTES.BLOGS.ADMIN.CATEGORY_BY_ID,
   protect,
   adminOnly,
+  validate(categoryIdParamSchema),
   deleteCategory
 );
 

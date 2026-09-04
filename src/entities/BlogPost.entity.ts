@@ -34,13 +34,13 @@ export class BlogPost {
   slug: string;
 
   @Column({ type: "text", nullable: true })
-  excerpt: string | null; 
+  excerpt: string | null;
 
   @Column({ type: "text" })
   content: string;
 
   @Column({ type: "varchar", nullable: true })
-  thumbnail: string | null; 
+  thumbnail: string | null;
 
   @Column({ type: "enum", enum: BlogPostStatus, default: BlogPostStatus.DRAFT })
   status: BlogPostStatus;
@@ -58,13 +58,12 @@ export class BlogPost {
   @Column({ type: "uuid" })
   categoryId: string;
 
-  @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+  @ManyToOne(() => User, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "authorId" })
   author: User;
 
   @ManyToOne(() => BlogCategory, (cat) => cat.posts, {
-    onDelete: "SET NULL",
-    nullable: true,
+    onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "categoryId" })
   category: BlogCategory;
