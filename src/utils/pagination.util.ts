@@ -9,6 +9,7 @@ export interface PaginatedResult<T> {
   items: T[];
   total: number;
   page: number;
+  limit: number;
   totalPages: number;
 }
 
@@ -22,7 +23,7 @@ export function buildPaginatedResult<T>(
   page: number,
   limit: number
 ): PaginatedResult<T> {
-  return { items, total, page, totalPages: Math.ceil(total / limit) };
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export function buildPaginationMeta<T>(result: PaginatedResult<T>) {
@@ -30,6 +31,7 @@ export function buildPaginationMeta<T>(result: PaginatedResult<T>) {
     currentPage: result.page,
     totalPages: result.totalPages,
     total: result.total,
+    limit: result.limit,
     hasNextPage: result.page < result.totalPages,
     hasPrevPage: result.page > 1,
   };

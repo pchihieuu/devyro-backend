@@ -79,7 +79,7 @@ export const getJobs = asyncHandler<
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: result.items,
-    pagination: { ...buildPaginationMeta(result), limit: pagination.limit },
+    pagination: buildPaginationMeta(result),
   });
 });
 
@@ -102,7 +102,7 @@ export const getJobsEmployer = asyncHandler<
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: result.items,
-    pagination: { ...buildPaginationMeta(result), limit },
+    pagination: buildPaginationMeta(result),
   });
 });
 
