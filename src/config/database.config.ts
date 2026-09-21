@@ -21,14 +21,27 @@ import { GroupMessageSeen } from "../entities/GroupMessageSeen.entity";
 
 const isProduction = config.nodeEnv === "production";
 
-if (process.env.DATABASE_URL) {
-  const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ":****@");
-  console.log("DATABASE_URL (masked):", maskedUrl);
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+// App chạy bình thường: 30s. Lệnh migration override qua DB_STATEMENT_TIMEOUT_MS.
+const statementTimeoutMs = parsePositiveInt(
+  process.env.DB_STATEMENT_TIMEOUT_MS,
+  30_000
+);
+
+if (!isProduction) {
+  if (process.env.DATABASE_URL) {
+    const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ":****@");
+    console.log("DATABASE_URL (masked):", maskedUrl);
+  }
+  console.log("DB_HOST:", config.database.host);
+  console.log("DB_PORT:", config.database.port);
+  console.log("DB_USERNAME:", config.database.username);
+  console.log("DB_DATABASE:", config.database.database);
 }
-console.log("DB_HOST:", config.database.host);
-console.log("DB_PORT:", config.database.port);
-console.log("DB_USERNAME:", config.database.username);
-console.log("DB_DATABASE:", config.database.database);
 
 const baseConfig: Partial<DataSourceOptions> = {
   type: "postgres",
@@ -87,8 +100,8 @@ const productionConfig: DataSourceOptions = {
   },
   extra: {
     connectionTimeoutMillis: 30000,
-    query_timeout: 30000,
-    statement_timeout: 30000,
+    query_timeout: statementTimeoutMs,
+    statement_timeout: statementTimeoutMs,
     max: 10,
     idleTimeoutMillis: 30000,
   },
