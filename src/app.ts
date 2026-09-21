@@ -21,6 +21,10 @@ import groupChatRoutes from "./routes/group-chat.routes";
 
 const app: Express = express();
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 setupMetrics(app);
 
 app.use(
@@ -64,13 +68,6 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.set("trust proxy", 1);
 
-app.get(`${API_PREFIX}${ROUTES.HEALTH.CHECK}`, (req, res) => {
-  res.json({
-    success: true,
-    message: "Job Portal API is running",
-    version: "1.0.0",
-  });
-});
 
 app.use(`${API_PREFIX}${ROUTES.AUTH.BASE}`, authRoutes);
 app.use(`${API_PREFIX}${ROUTES.USERS.BASE}`, userRoutes);
