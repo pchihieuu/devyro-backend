@@ -88,13 +88,17 @@ interface AppConfig {
 
 const validateEnv = (): void => {
   const required = [
-    "DB_PASSWORD",
-    "DB_DATABASE",
+    // "DB_PASSWORD",
+    // "DB_DATABASE",
     "JWT_SECRET",
     "JWT_REFRESH_SECRET",
     "GEMINI_API_KEY",
+    "RABBITMQ_URL",
     "REDIS_URL",
   ];
+  if (!process.env.DATABASE_URL) {
+    required.push("DB_PASSWORD", "DB_DATABASE")
+  }
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
@@ -142,7 +146,7 @@ export const config: AppConfig = {
     origin:
       process.env.CORS_ORIGIN ||
       process.env.CLIENT_URL ||
-      "https://devyro.vercel.app/",
+      "https://devyro.vercel.app",
     credentials: true,
   },
   rateLimit: {
