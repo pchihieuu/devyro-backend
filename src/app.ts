@@ -21,10 +21,6 @@ import groupChatRoutes from "./routes/group-chat.routes";
 
 const app: Express = express();
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
 setupMetrics(app);
 
 app.use(
@@ -68,6 +64,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.set("trust proxy", 1);
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 app.use(`${API_PREFIX}${ROUTES.AUTH.BASE}`, authRoutes);
 app.use(`${API_PREFIX}${ROUTES.USERS.BASE}`, userRoutes);
