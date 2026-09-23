@@ -1,10 +1,21 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, ManyToOne, JoinColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
 } from "typeorm";
 import { BlogPost } from "./BlogPost.entity";
 
+/**
+ * PERF FIX: findRecentView() (dedupe window for view counting) filters on
+ * (postId, viewedAt) — and userId/ipAddress on top — every single time a
+ * blog post is opened. No index previously existed on this table at all.
+ */
 @Entity("blog_post_views")
+@Index("IDX_blog_post_views_post_viewed", ["postId", "viewedAt"])
 export class BlogPostView {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -20,7 +31,7 @@ export class BlogPostView {
 
   @Column({ type: "uuid", nullable: true })
   userId: string | null;
-  
+
   @CreateDateColumn()
   viewedAt: Date;
 

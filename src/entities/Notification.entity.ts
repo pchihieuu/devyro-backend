@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User.entity";
 
@@ -15,7 +16,15 @@ export enum NotificationType {
   JOB_SAVED = "job_saved",
 }
 
+/**
+ * PERF FIX: findManyByUser orders by (userId, createdAt DESC); countUnread
+ * filters (userId, isRead). Neither had a supporting index — both were
+ * sequential scans, worst offender being the "unread count" badge which
+ * every screen calls.
+ */
 @Entity("notifications")
+@Index("IDX_notifications_user_created", ["userId", "createdAt"])
+@Index("IDX_notifications_user_isRead", ["userId", "isRead"])
 export class Notification {
   @PrimaryGeneratedColumn("uuid")
   id: string;

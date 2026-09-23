@@ -1,6 +1,10 @@
 import "reflect-metadata";
 import express, { Express } from "express";
 import cors from "cors";
+import morgan from "morgan";
+import { logger, morganStream } from "./utils/logger";
+import { requestId } from "./middlewares/requestId.middleware";
+import { apiLimiter } from "./middlewares/rateLimiter.middleware";
 import authRoutes from "./routes/auth.route";
 import userRoutes from "./routes/user.route";
 import jobRoutes from "./routes/job.route";
@@ -21,7 +25,25 @@ import groupChatRoutes from "./routes/group-chat.routes";
 
 const app: Express = express();
 
+// Must run before everything else — every log line and error response
+// downstream (including inside setupMetrics/helmet) can reference req.id.
+app.use(requestId);
+
 setupMetrics(app);
+
+// OBSERVABILITY GAP: morgan was a declared dependency with a ready-made
+// morganStream (utils/logger.ts) but was never actually registered — there
+// was no HTTP access log at all, only whatever individual
+// controllers/services happened to console.log. This gives every request a
+// structured line (status, latency, correlation id) regardless of whether
+// the handler logs anything itself.
+morgan.token("id", (req) => (req as any).id ?? "-");
+app.use(
+  morgan(
+    ':id :method :url :status :res[content-length] - :response-time ms',
+    { stream: morganStream }
+  )
+);
 
 app.use(
   helmet({
@@ -67,6 +89,17 @@ app.set("trust proxy", 1);
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
+
+// SCALABILITY/DDoS GAP: apiLimiter was fully defined in
+// rateLimiter.middleware.ts but never mounted anywhere — every read
+// endpoint (job listing, search, blog, notifications, ...) had NO rate
+// limiting at all; only auth/upload/job-creation had their own dedicated
+// limiters. Applied globally, after the health check (so uptime monitors
+// like the GitHub Actions keep-alive workflow are never throttled) and
+// before the versioned routes, so route-specific limiters (authLimiter,
+// uploadLimiter, ...) still apply on top for the endpoints that need a
+// tighter budget than the general default.
+app.use(API_PREFIX, apiLimiter);
 
 app.use(`${API_PREFIX}${ROUTES.AUTH.BASE}`, authRoutes);
 app.use(`${API_PREFIX}${ROUTES.USERS.BASE}`, userRoutes);

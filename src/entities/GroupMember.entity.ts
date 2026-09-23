@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   UpdateDateColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User.entity";
 import { Group } from "./Group.entity";
@@ -21,7 +22,17 @@ export enum MemberStatus {
   LEFT = "left",
   KICKED = "kicked",
 }
+/**
+ * BUG FIX: no DB-level constraint previously stopped 2 rows for the same
+ * (group_id, user_id) pair — addMembers()/createGroup() only guard against
+ * this in application code, so a race (2 concurrent addMembers calls) could
+ * insert a duplicate membership row. Unique index closes that gap.
+ * Second index supports assertActiveMember/assertAdmin's hot-path lookup
+ * `where: { userId, groupId, status: ACTIVE }`, which currently table-scans.
+ */
 @Entity("group_members")
+@Index("IDX_group_members_group_user", ["groupId", "userId"], { unique: true })
+@Index("IDX_group_members_group_status", ["groupId", "status"])
 export class GroupMember {
   @PrimaryGeneratedColumn("uuid")
   id: string;

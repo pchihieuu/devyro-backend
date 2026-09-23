@@ -8,6 +8,8 @@ declare global {
       tokenPayload?: JwtPayload;
       validatedQuery?: Record<string, any>;
       validatedParams?: Record<string, any>;
+      // Set by requestId.middleware.ts — correlation id for logs/tracing.
+      id?: string;
     }
   }
 }

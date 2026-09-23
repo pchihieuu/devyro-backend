@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User.entity";
 
@@ -15,6 +16,8 @@ export enum MessageType {
 }
 
 @Entity("messages")
+@Index("IDX_messages_sender_receiver", ["senderId", "receiverId"])
+@Index("IDX_messages_receiver_sender", ["receiverId", "senderId"])
 export class Message {
   @PrimaryGeneratedColumn("uuid")
   id: string;
