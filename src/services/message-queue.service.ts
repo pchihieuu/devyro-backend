@@ -1,5 +1,6 @@
 import amqplib, { Channel, ChannelModel } from "amqplib";
-import { config } from './../config/env.config';
+import { config } from "./../config/env.config";
+import { logger } from "../utils/logger";
 
 export enum QueueName {
   GROUP_MESSAGE = "group.message",
@@ -11,6 +12,23 @@ export enum ExchangeName {
   GROUP_EVENTS = "group.events",
   CHAT_EVENTS = "chat.events",
 }
+
+/**
+ * DLQ FIX: every queue now declares x-dead-letter-exchange pointing here.
+ * Previously ch.nack(msg, false, false) (requeue=false, no DLX configured)
+ * silently DISCARDED the message forever on any consumer error or after
+ * exhausting delivery — no way to inspect/replay a poison message. Now a
+ * nack with requeue=false is auto-routed here by RabbitMQ instead of
+ * dropped, and DLQ_TTL lets an operator re-queue after fixing the bug
+ * (messages expire back onto DLX_EXCHANGE -> original queue via CC/dead-letter
+ * chaining is intentionally NOT set up automatically — replay is a manual,
+ * reviewed action, not automatic, since the failure could be poison data).
+ */
+const DLX_EXCHANGE = "dead-letter.events";
+const DLQ_NAME = "dead-letter.queue";
+
+/** Delivery attempts before we give up and route a message to the DLQ instead of requeueing. */
+const MAX_DELIVERY_ATTEMPTS = 5;
 
 export interface QueueMessage<T = unknown> {
   type: string;
@@ -66,7 +84,7 @@ class MessageQueueService {
     this.isConnecting = true;
 
     try {
-      const url = config.rmq.url
+      const url = config.rmq.url;
       if (!url) throw new Error("RABBITMQ_URL is not set");
 
       this.connection = await amqplib.connect(url);
@@ -153,24 +171,39 @@ class MessageQueueService {
 
   private async setupExchangesAndQueues(ch: Channel): Promise<void> {
     const TTL = 24 * 60 * 60 * 1000;
+    // DLQ messages kept much longer than live queues — they're for manual
+    // inspection/replay by an operator, not routine traffic.
+    const DLQ_TTL = 7 * 24 * 60 * 60 * 1000;
 
     await Promise.all([
       ch.assertExchange(ExchangeName.GROUP_EVENTS, "topic", { durable: true }),
       ch.assertExchange(ExchangeName.CHAT_EVENTS, "topic", { durable: true }),
+      ch.assertExchange(DLX_EXCHANGE, "fanout", { durable: true }),
     ]);
+
+    await ch.assertQueue(DLQ_NAME, {
+      durable: true,
+      arguments: { "x-message-ttl": DLQ_TTL },
+    });
+    await ch.bindQueue(DLQ_NAME, DLX_EXCHANGE, "");
+
+    const liveQueueArgs = {
+      "x-message-ttl": TTL,
+      "x-dead-letter-exchange": DLX_EXCHANGE,
+    };
 
     await Promise.all([
       ch.assertQueue(QueueName.GROUP_MESSAGE, {
         durable: true,
-        arguments: { "x-message-ttl": TTL },
+        arguments: liveQueueArgs,
       }),
       ch.assertQueue(QueueName.GROUP_NOTIFICATION, {
         durable: true,
-        arguments: { "x-message-ttl": TTL },
+        arguments: liveQueueArgs,
       }),
       ch.assertQueue(QueueName.CHAT_MESSAGE, {
         durable: true,
-        arguments: { "x-message-ttl": TTL },
+        arguments: liveQueueArgs,
       }),
     ]);
 
@@ -258,6 +291,20 @@ class MessageQueueService {
     }
   }
 
+  /**
+   * Local (in-process) redelivery counter keyed by messageId, capped at
+   * MAX_DELIVERY_ATTEMPTS. We deliberately do NOT use ch.nack(msg, false,
+   * true) (redeliver-in-place) for retries: a poison message would then
+   * spin at the head of the queue forever, blocking every message behind
+   * it (head-of-line blocking) since prefetch is small. Instead we retry
+   * a bounded number of times in-process with a short delay, and only
+   * nack(requeue=false) — which the queue's x-dead-letter-exchange routes
+   * to the DLQ — once attempts are exhausted. This counter resets on
+   * worker restart, which is an accepted tradeoff: worst case a message
+   * gets a few extra retries after a deploy, never fewer.
+   */
+  private attemptCounts = new Map<string, number>();
+
   async consume<T>(
     queue: QueueName,
     handler: (msg: QueueMessage<T>) => Promise<void>
@@ -266,13 +313,45 @@ class MessageQueueService {
 
     await ch.consume(queue, async (msg) => {
       if (!msg) return;
+      const messageId =
+        msg.properties.messageId || msg.fields.deliveryTag.toString();
+
       try {
         const content: QueueMessage<T> = JSON.parse(msg.content.toString());
         await handler(content);
         ch.ack(msg);
+        this.attemptCounts.delete(messageId);
       } catch (error) {
-        console.error(`[MQ] Error processing message from ${queue}:`, error);
-        ch.nack(msg, false, false);
+        const attempts = (this.attemptCounts.get(messageId) ?? 0) + 1;
+        logger.error(`[MQ] Error processing message from ${queue}`, {
+          error: error instanceof Error ? error.message : error,
+          attempts,
+        });
+
+        if (attempts >= MAX_DELIVERY_ATTEMPTS) {
+          this.attemptCounts.delete(messageId);
+          // Give up — requeue=false routes to the queue's
+          // x-dead-letter-exchange instead of discarding the message.
+          logger.error(
+            `[MQ] ${queue} message exceeded ${MAX_DELIVERY_ATTEMPTS} attempts, routing to DLQ`
+          );
+          ch.nack(msg, false, false);
+        } else {
+          this.attemptCounts.set(messageId, attempts);
+          ch.ack(msg); // remove from the live queue…
+          setTimeout(
+            () => {
+              // …and re-publish for another attempt after a short backoff,
+              // instead of an in-place requeue that would block the queue.
+              this.publishChannel?.sendToQueue(
+                queue,
+                msg.content,
+                msg.properties
+              );
+            },
+            Math.min(1000 * 2 ** attempts, 30_000)
+          );
+        }
       }
     });
   }

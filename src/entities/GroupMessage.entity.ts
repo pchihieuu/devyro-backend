@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  Index,
 } from "typeorm";
 import { User } from "./User.entity";
 import { Group } from "./Group.entity";
@@ -19,6 +20,7 @@ export enum MessageType {
 }
 
 @Entity("group_messages")
+@Index("IDX_group_messages_group_created", ["groupId", "createdAt"])
 export class GroupMessage {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -27,6 +29,7 @@ export class GroupMessage {
   groupId: string;
 
   @Column({ type: "uuid", name: "sender_id" })
+  @Index()
   senderId: string;
 
   @Column({ type: "text", nullable: true })

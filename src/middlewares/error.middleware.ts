@@ -51,6 +51,7 @@ export const errorHandler = (
 
   if (!isOperational || statusCode >= 500) {
     logger.error("Error:", {
+      requestId: req.id,
       message: err.message,
       stack: err.stack,
       url: req.url,
@@ -60,6 +61,7 @@ export const errorHandler = (
     });
   } else {
     logger.warn("Operational Error:", {
+      requestId: req.id,
       message: err.message,
       url: req.url,
       method: req.method,
@@ -77,6 +79,7 @@ export const errorHandler = (
     success: false,
     message,
     errors,
+    requestId: req.id,
     ...(isDev && { stack: err.stack }),
   });
 };
