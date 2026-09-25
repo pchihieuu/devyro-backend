@@ -142,8 +142,24 @@ export class WebSocketService {
         // nên không thể xác định server tự restart hay do mạng.
         console.log(`User disconnected: ${socket.userId} (reason: ${reason})`);
         if (socket.userId) {
-          this.userSockets.delete(socket.userId);
-          this.io.emit("user:offline", { userId: socket.userId });
+          // FIX: chỉ xóa khỏi map & báo offline nếu socket.id NÀY vẫn đang
+          // là socket hiện hành của user trong map. Trước đây delete/emit
+          // vô điều kiện — nếu user đã reconnect bằng socket mới (B) TRƯỚC
+          // KHI socket cũ (A) kịp nhận diện mất kết nối (thường gặp khi tab
+          // bị trình duyệt throttle rồi wake up), disconnect handler của A
+          // chạy sau sẽ xóa nhầm entry của B đang sống, bắn "user:offline"
+          // sai cho một user vẫn đang online — đúng là nguyên nhân của
+          // pattern "offline → online → offline" bạn thấy khi treo tab lâu.
+          const isCurrentSocket =
+            this.userSockets.get(socket.userId) === socket.id;
+          if (isCurrentSocket) {
+            this.userSockets.delete(socket.userId);
+            this.io.emit("user:offline", { userId: socket.userId });
+          } else {
+            console.log(
+              `Stale socket disconnect ignored for ${socket.userId} — a newer connection is already active`
+            );
+          }
         }
       });
     });
