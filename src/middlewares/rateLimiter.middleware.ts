@@ -15,10 +15,47 @@ const getClientIp = (req: Request): string => {
   return ip.replace(/^::ffff:/, "");
 };
 
+// Các route polling nhẹ (bell/badge/session-check) được gọi lặp lại theo
+// interval hoặc mỗi lần socket reconnect — không phải hành vi bất thường,
+// nên loại khỏi apiLimiter global và để tự chịu tải riêng (hoặc limiter
+// riêng nhẹ hơn nếu cần sau này). req.path ở đây đã tương đối so với
+// API_PREFIX (vd "/auth/me", "/notifications/unread-count").
+const LIGHT_POLLING_PATHS = [
+  "/auth/me",
+  "/notifications/unread-count",
+  "/chat/unread-count",
+];
+
+const isLightPollingRoute = (req: Request): boolean =>
+  LIGHT_POLLING_PATHS.some((p) => req.path === p);
+
 // General API rate limiter
+//
+// FIX: trước đây key theo IP (default) với max=100/15 phút — quá thấp so với
+// pattern thực tế của app (socket reconnect + polling định kỳ có thể bắn
+// 8-10 request/phút CHO MỖI user). Nhiều user sau NAT/proxy dùng chung IP
+// càng dễ cộng dồn chạm ngưỡng. Đổi sang:
+//  - keyGenerator theo user id (decode JWT, không cần verify — chỉ dùng để
+//    phân nhóm rate-limit, không phải quyết định auth) khi đã đăng nhập,
+//    fallback về IP cho request chưa auth.
+//  - Nới max lên mức đủ chịu được polling/reconnect bình thường của 1 user,
+//    vẫn đủ chặn abuse thật sự.
+//  - Bỏ qua các route polling nhẹ đã liệt kê ở trên.
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 600, // ~40 req/phút/user trung bình trong cửa sổ 15 phút
+  keyGenerator: (req: Request): string => {
+    try {
+      const header = req.headers.authorization;
+      if (header?.startsWith("Bearer ")) {
+        const token = header.split(" ")[1];
+        const decoded = decodeToken(token);
+        if (decoded?.id) return `api:userId:${decoded.id}`;
+      }
+    } catch {}
+    return `api:ip:${getClientIp(req)}`;
+  },
+  skip: isLightPollingRoute,
   message: { success: false, message: HTTP_MESSAGE.TOO_MANY_REQUESTS },
   standardHeaders: true,
   legacyHeaders: false,
