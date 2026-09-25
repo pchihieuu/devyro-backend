@@ -90,15 +90,12 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// SCALABILITY/DDoS GAP: apiLimiter was fully defined in
-// rateLimiter.middleware.ts but never mounted anywhere — every read
-// endpoint (job listing, search, blog, notifications, ...) had NO rate
-// limiting at all; only auth/upload/job-creation had their own dedicated
-// limiters. Applied globally, after the health check (so uptime monitors
-// like the GitHub Actions keep-alive workflow are never throttled) and
-// before the versioned routes, so route-specific limiters (authLimiter,
-// uploadLimiter, ...) still apply on top for the endpoints that need a
-// tighter budget than the general default.
+// Global limiter cho toàn bộ /api/v1/*. Key theo user id (fallback IP) và
+// bỏ qua các route polling nhẹ — xem chi tiết & lý do trong
+// rateLimiter.middleware.ts. Mount sau health check (uptime monitor không
+// bị throttle) và trước các route cụ thể, nên các limiter chặt hơn
+// (authLimiter, uploadLimiter, ...) vẫn áp dụng chồng lên cho endpoint cần
+// ngưỡng thấp hơn mức chung.
 app.use(API_PREFIX, apiLimiter);
 
 app.use(`${API_PREFIX}${ROUTES.AUTH.BASE}`, authRoutes);

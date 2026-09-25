@@ -20,6 +20,11 @@ export class WebSocketService {
         origin: process.env.CLIENT_URL,
         credentials: true,
       },
+      // Khai báo tường minh (thay vì để default 25000/20000ms) để dễ đối
+      // chiếu với cấu hình client khi debug disconnect lặp lại — nếu client
+      // dùng giá trị khác, mismatch này có thể tự gây ra ping timeout giả.
+      pingInterval: 25000,
+      pingTimeout: 20000,
     });
 
     this.setupMiddleware();
@@ -129,8 +134,13 @@ export class WebSocketService {
         }
       });
 
-      socket.on("disconnect", () => {
-        console.log(`User disconnected: ${socket.userId}`);
+      socket.on("disconnect", (reason) => {
+        // Log rõ nguyên nhân để phân biệt: "ping timeout" (mất kết nối
+        // thật/mismatch cấu hình), "transport close" (server restart/redeploy,
+        // đúng với ts-node-dev --respawn), "client namespace disconnect"
+        // (client tự chủ động ngắt), v.v. Trước đây log không có `reason`
+        // nên không thể xác định server tự restart hay do mạng.
+        console.log(`User disconnected: ${socket.userId} (reason: ${reason})`);
         if (socket.userId) {
           this.userSockets.delete(socket.userId);
           this.io.emit("user:offline", { userId: socket.userId });
