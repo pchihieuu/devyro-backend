@@ -14,9 +14,19 @@ jobs:
     steps:
       - name: Query Supabase to reset inactivity timer
         run: |
-          curl -sf -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/heartbeat?select=id&limit=1" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          http_code=$(curl -s -o /tmp/supabase_response.txt -w "%{http_code}" \
+            -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/heartbeat?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+
+          echo "HTTP status: $http_code"
+          echo "Response body:"
+          cat /tmp/supabase_response.txt
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Supabase heartbeat ping failed with status $http_code"
+            exit 1
+          fi
 
   check-render:
     if: github.event.schedule == '0 2 * * *' || github.event_name == 'workflow_dispatch'
@@ -25,12 +35,25 @@ jobs:
       - name: Health-check Render backend
         id: healthcheck
         run: |
-          if curl -sf --max-time 90 "${{ secrets.RENDER_HEALTH_URL }}" > /tmp/response.txt; then
-            echo "status=ok" >> "$GITHUB_OUTPUT"
-          elif curl -sf --max-time 90 "${{ secrets.RENDER_HEALTH_URL }}" > /tmp/response.txt; then
+          check() {
+            http_code=$(curl -s -o /tmp/render_response.txt -w "%{http_code}" \
+              --max-time 90 "${{ secrets.RENDER_HEALTH_URL }}")
+            echo "HTTP status: $http_code"
+            [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]
+          }
+
+          if check; then
             echo "status=ok" >> "$GITHUB_OUTPUT"
           else
-            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "First attempt failed, retrying in 10s..."
+            sleep 10
+            if check; then
+              echo "status=ok" >> "$GITHUB_OUTPUT"
+            else
+              echo "Response body:"
+              cat /tmp/render_response.txt
+              echo "status=fail" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Notify Telegram on failure
