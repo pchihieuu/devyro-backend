@@ -44,10 +44,9 @@ setupMetrics(app);
 // the handler logs anything itself.
 morgan.token("id", (req) => (req as any).id ?? "-");
 app.use(
-  morgan(
-    ':id :method :url :status :res[content-length] - :response-time ms',
-    { stream: morganStream }
-  )
+  morgan(":id :method :url :status :res[content-length] - :response-time ms", {
+    stream: morganStream,
+  })
 );
 
 app.use(

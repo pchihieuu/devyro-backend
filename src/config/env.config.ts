@@ -107,7 +107,7 @@ const validateEnv = (): void => {
     "REDIS_URL",
   ];
   if (!process.env.DATABASE_URL) {
-    required.push("DB_PASSWORD", "DB_DATABASE")
+    required.push("DB_PASSWORD", "DB_DATABASE");
   }
   const missing = required.filter((key) => !process.env[key]);
 
@@ -188,8 +188,8 @@ export const config: AppConfig = {
   },
   nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "5000", 10),
-  clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   cookieDomain: process.env.COOKIE_DOMAIN,
   rmq: {
     url: process.env.RABBITMQ_URL as string,
