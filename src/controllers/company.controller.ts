@@ -2,10 +2,10 @@ import { Response } from "express";
 import { companyService } from "../services/company.service";
 import { uploadService } from "../services/upload.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { HTTP_MESSAGE } from "../constants/httpStatus";
 import { ForbiddenError, BadRequestError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
-import { buildPaginationMeta } from "../utils/pagination.util";
+import { ApiResponse } from "../utils/api-response";
 import {
   GetAllCompaniesQuery,
   CreateCompanyBody,
@@ -28,11 +28,7 @@ export const createCompany = asyncHandler<
     throw new ForbiddenError("Only employers can create companies");
   }
   const company = await companyService.createCompany(req.user!.id, req.body);
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    message: HTTP_MESSAGE.CREATED,
-    data: company,
-  });
+  ApiResponse.created(res, company, HTTP_MESSAGE.CREATED);
 });
 
 export const getAllCompanies = asyncHandler<
@@ -46,18 +42,14 @@ export const getAllCompanies = asyncHandler<
     { page, limit, sortBy, order }
   );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });
 
 export const getCompanyById = asyncHandler<
   ValidatedRequest<GetCompanyByIdParams>
 >(async (req, res: Response): Promise<void> => {
   const company = await companyService.getCompanyById(req.validatedParams.id);
-  res.status(HTTP_STATUS.OK).json({ success: true, data: company });
+  ApiResponse.ok(res, company);
 });
 
 export const getMyCompany = asyncHandler(
@@ -66,7 +58,7 @@ export const getMyCompany = asyncHandler(
       throw new ForbiddenError("Only employers can access this resource");
     }
     const company = await companyService.getCompanyByEmployerId(req.user!.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, data: company });
+    ApiResponse.ok(res, company);
   }
 );
 
@@ -78,11 +70,7 @@ export const getCompanyJobs = asyncHandler<
     req.validatedQuery
   );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });
 
 export const updateCompany = asyncHandler<
@@ -97,20 +85,14 @@ export const updateCompany = asyncHandler<
     req.user!.id,
     req.body
   );
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: HTTP_MESSAGE.UPDATED,
-    data: company,
-  });
+  ApiResponse.ok(res, company, HTTP_MESSAGE.UPDATED);
 });
 
 export const deleteCompany = asyncHandler<
   ValidatedRequest<GetCompanyByIdParams>
 >(async (req, res: Response): Promise<void> => {
   await companyService.deleteCompany(req.validatedParams.id, req.user!.id);
-  res
-    .status(HTTP_STATUS.OK)
-    .json({ success: true, message: HTTP_MESSAGE.DELETED });
+  ApiResponse.message(res, HTTP_MESSAGE.DELETED);
 });
 
 /**
@@ -128,10 +110,10 @@ export const uploadCompanyLogo = asyncHandler(
       req.file.buffer,
       req.file.mimetype
     );
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: "Company logo uploaded successfully",
-      data: { logoUrl: result.url, publicId: result.publicId },
-    });
+    ApiResponse.created(
+      res,
+      { logoUrl: result.url, publicId: result.publicId },
+      "Company logo uploaded successfully"
+    );
   }
 );

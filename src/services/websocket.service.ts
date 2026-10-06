@@ -1,8 +1,6 @@
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { Server as HTTPServer } from "http";
-import jwt from "jsonwebtoken";
-import { AppDataSource } from "../config/database.config";
-import { User } from "../entities/User.entity";
+import { authenticateAccessToken } from "./access-token-auth.service";
 import { groupChatService } from "./group-chat.service";
 import { NotificationWSPayload } from "../types/notification.types";
 
@@ -40,19 +38,10 @@ export class WebSocketService {
           return next(new Error("Authentication error: No token provided"));
         }
 
-        const decoded = jwt.verify(
-          token,
-          process.env.JWT_SECRET || "your-secret-key"
-        ) as { id: string };
-
-        const userRepository = AppDataSource.getRepository(User);
-        const user = await userRepository.findOne({
-          where: { id: decoded.id },
-        });
-
-        if (!user) {
-          return next(new Error("Authentication error: User not found"));
-        }
+        // Cùng logic với HTTP `protect`: chữ ký + blacklist + validAfter.
+        // (Trước đây jwt.verify với secret fallback "your-secret-key" và bỏ qua
+        // thu hồi token → token đã logout vẫn kết nối realtime được.)
+        const { user } = await authenticateAccessToken(token);
 
         socket.userId = user.id;
         next();

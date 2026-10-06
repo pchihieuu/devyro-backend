@@ -3,7 +3,7 @@ import { authService } from "../services/auth.service";
 import { uploadService } from "../services/upload.service";
 import { userService } from "../services/user.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS } from "../constants/httpStatus";
+import { ApiResponse } from "../utils/api-response";
 import { BadRequestError, UnauthorizedError } from "../utils/errors";
 import { config } from "../config/env.config";
 
@@ -65,12 +65,11 @@ export const register = asyncHandler(
 
     const { refreshToken, ...userData } = result;
 
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message:
-        "User registered successfully. Welcome email sent to your inbox.",
-      data: userData,
-    });
+    ApiResponse.created(
+      res,
+      userData,
+      "User registered successfully. Welcome email sent to your inbox."
+    );
   }
 );
 
@@ -90,11 +89,7 @@ export const login = asyncHandler(
 
       const { refreshToken, ...userData } = result;
 
-      res.status(HTTP_STATUS.OK).json({
-        success: true,
-        message: "Login successful",
-        data: userData,
-      });
+      ApiResponse.ok(res, userData, "Login successful");
     } catch (error) {
       clearRefreshTokenCookie(res);
       throw error;
@@ -125,13 +120,11 @@ export const refreshToken = asyncHandler(
 
       setRefreshTokenCookie(res, tokens.refreshToken);
 
-      res.status(HTTP_STATUS.OK).json({
-        success: true,
-        message: "Token refreshed successfully",
-        data: {
-          accessToken: tokens.accessToken,
-        },
-      });
+      ApiResponse.ok(
+        res,
+        { accessToken: tokens.accessToken },
+        "Token refreshed successfully"
+      );
     } catch (error) {
       clearRefreshTokenCookie(res);
       throw error;
@@ -149,10 +142,7 @@ export const logout = asyncHandler(
 
     clearRefreshTokenCookie(res);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Logged out successfully",
-    });
+    ApiResponse.message(res, "Logged out successfully");
   }
 );
 
@@ -166,10 +156,7 @@ export const logoutAll = asyncHandler(
 
     clearRefreshTokenCookie(res);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Logged out from all devices successfully",
-    });
+    ApiResponse.message(res, "Logged out from all devices successfully");
   }
 );
 
@@ -181,10 +168,7 @@ export const getActiveSessions = asyncHandler(
 
     const sessions = await authService.getActiveSessions(req.user.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: sessions,
-    });
+    ApiResponse.ok(res, sessions);
   }
 );
 
@@ -198,10 +182,7 @@ export const revokeSession = asyncHandler(
 
     await authService.revokeSession(req.user.id, tokenId);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Session revoked successfully",
-    });
+    ApiResponse.message(res, "Session revoked successfully");
   }
 );
 
@@ -212,10 +193,7 @@ export const getMe = asyncHandler(
     }
     const user = await userService.getMyProfile(req.user.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: user,
-    });
+    ApiResponse.ok(res, user);
   }
 );
 
@@ -230,14 +208,11 @@ export const uploadImagePublic = asyncHandler(
       req.file.mimetype
     );
 
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: "Image uploaded successfully",
-      data: {
-        imageUrl: result.url,
-        publicId: result.publicId,
-      },
-    });
+    ApiResponse.created(
+      res,
+      { imageUrl: result.url, publicId: result.publicId },
+      "Image uploaded successfully"
+    );
   }
 );
 
@@ -251,14 +226,11 @@ export const uploadImage = asyncHandler(
       req.file.mimetype
     );
 
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: "Image uploaded successfully",
-      data: {
-        imageUrl: result.url,
-        publicId: result.publicId,
-      },
-    });
+    ApiResponse.created(
+      res,
+      { imageUrl: result.url, publicId: result.publicId },
+      "Image uploaded successfully"
+    );
 
     userService.updateAvatar(req.user.id, result.url).catch((err) => {
       console.error("Failed to update user avatar:", err);
@@ -276,14 +248,11 @@ export const uploadResume = asyncHandler(
       req.file.mimetype
     );
 
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: "Resume uploaded successfully",
-      data: {
-        resumeUrl: result.url,
-        publicId: result.publicId,
-      },
-    });
+    ApiResponse.created(
+      res,
+      { resumeUrl: result.url, publicId: result.publicId },
+      "Resume uploaded successfully"
+    );
 
     userService.updateResume(req.user.id, result.url).catch((err) => {
       console.error("Failed to update user resume:", err);
@@ -300,11 +269,10 @@ export const forgotPassword = asyncHandler(
 
     await authService.forgotPassword({ email });
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message:
-        "If an account exists with this email, a password reset link has been sent.",
-    });
+    ApiResponse.message(
+      res,
+      "If an account exists with this email, a password reset link has been sent."
+    );
   }
 );
 
@@ -317,11 +285,10 @@ export const resetPassword = asyncHandler(
 
     await authService.resetPassword({ token, newPassword });
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message:
-        "Password has been reset successfully. Please login with your new password.",
-    });
+    ApiResponse.message(
+      res,
+      "Password has been reset successfully. Please login with your new password."
+    );
   }
 );
 
@@ -338,9 +305,6 @@ export const verifyResetToken = asyncHandler(
       throw new BadRequestError("Invalid or expired password reset token");
     }
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "Token is valid",
-    });
+    ApiResponse.message(res, "Token is valid");
   }
 );

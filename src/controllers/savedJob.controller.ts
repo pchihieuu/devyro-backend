@@ -1,8 +1,7 @@
 import { Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS } from "../constants/httpStatus";
 import { savedJobService } from "../services/savedJob.service";
-import { buildPaginationMeta } from "../utils/pagination.util";
+import { ApiResponse } from "../utils/api-response";
 import { ValidatedRequest } from "../types/express";
 import {
   GetMySavedJobsQuery,
@@ -18,11 +17,7 @@ export const saveJob = asyncHandler<
     req.user!.id
   );
 
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    message: "Job saved successfully",
-    data: savedJob,
-  });
+  ApiResponse.created(res, savedJob, "Job saved successfully");
 });
 
 export const unsaveJob = asyncHandler<
@@ -30,10 +25,7 @@ export const unsaveJob = asyncHandler<
 >(async (req, res: Response): Promise<void> => {
   await savedJobService.unsaveJob(req.validatedParams.jobId, req.user!.id);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Job removed from saved list",
-  });
+  ApiResponse.message(res, "Job removed from saved list");
 });
 
 export const getMySavedJobs = asyncHandler<
@@ -44,9 +36,5 @@ export const getMySavedJobs = asyncHandler<
     req.validatedQuery
   );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });

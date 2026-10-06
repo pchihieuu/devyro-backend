@@ -1,137 +1,82 @@
 import { Request, Response, NextFunction } from "express";
-import { AppDataSource } from "../config/database.config";
-import { User } from "../entities/User.entity";
-import { verifyAccessToken } from "../utils/token.utils";
-import { sessionRepository } from "../repositories/session.repository";
+import {
+  AuthRejection,
+  authenticateAccessToken,
+} from "../services/access-token-auth.service";
+import { ApiResponse } from "../utils/api-response";
+import { HTTP_STATUS } from "../constants/httpStatus";
+
+const hasBearer = (header: string | undefined): header is string =>
+  !!header && header.startsWith("Bearer");
 
 export const protect = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const header = req.headers.authorization;
+  if (!hasBearer(header)) {
+    ApiResponse.error(
+      res,
+      HTTP_STATUS.UNAUTHORIZED,
+      "Not authorized, no token provided",
+      { requestId: req.id }
+    );
+    return;
+  }
+
   try {
-    let token = req.headers.authorization;
-    if (!token || !token.startsWith("Bearer")) {
-      res
-        .status(401)
-        .json({ success: false, message: "Not authorized, no token provided" });
-      return;
-    }
-    token = token.split(" ")[1];
-
-    const decoded = verifyAccessToken(token); // JwtPayload: { id, email, role, jti, iat, exp }
-
-    if (
-      decoded.jti &&
-      (await sessionRepository.isAccessTokenBlacklisted(decoded.jti))
-    ) {
-      res.status(401).json({
-        success: false,
-        message: "Access token đã bị thu hồi",
-        code: "TOKEN_REVOKED",
-      });
-      return;
-    }
-
-    if (
-      decoded.iat &&
-      (await sessionRepository.isTokenIssuedBeforeInvalidation(
-        decoded.id,
-        decoded.iat
-      ))
-    ) {
-      res.status(401).json({
-        success: false,
-        message: "Phiên đăng nhập đã hết hiệu lực",
-        code: "SESSION_INVALIDATED",
-      });
-      return;
-    }
-
-    req.tokenPayload = decoded; // để logout controller tái dùng
-
-    let user = await sessionRepository.getCachedUserSession<User>(decoded.id);
-
-    if (!user) {
-      const userRepository = AppDataSource.getRepository(User);
-      user = await userRepository.findOne({
-        where: { id: decoded.id },
-        select: [
-          "id",
-          "name",
-          "email",
-          "role",
-          "avatar",
-          "resume",
-          "createdAt",
-          "updatedAt",
-        ],
-      });
-      if (!user) {
-        res.status(401).json({ success: false, message: "User not found" });
-        return;
-      }
-      await sessionRepository.cacheUserSession(decoded.id, user);
-    }
-
+    const { user, payload } = await authenticateAccessToken(header.split(" ")[1]);
+    req.tokenPayload = payload; // để logout controller tái dùng
     req.user = user;
     next();
   } catch (error) {
-    // Check if token is expired
-    if (error instanceof Error && error.message === "TOKEN_EXPIRED") {
-      res.status(401).json({
-        success: false,
-        message: "Access token expired",
-        code: "TOKEN_EXPIRED",
+    if (error instanceof AuthRejection) {
+      ApiResponse.error(res, HTTP_STATUS.UNAUTHORIZED, error.message, {
+        code: error.code,
+        requestId: req.id,
       });
       return;
     }
 
-    res.status(401).json({
-      success: false,
-      message: "Invalid access token",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    if (error instanceof Error && error.message === "TOKEN_EXPIRED") {
+      ApiResponse.error(res, HTTP_STATUS.UNAUTHORIZED, "Access token expired", {
+        code: "TOKEN_EXPIRED",
+        requestId: req.id,
+      });
+      return;
+    }
+
+    // Lỗi hạ tầng (Redis/DB sập) KHÔNG được báo thành "token sai" — đẩy sang
+    // error middleware để trả 5xx, log và báo lên Sentry. Bản cũ nuốt mọi lỗi
+    // thành 401 kèm `error.message` (lộ chi tiết nội bộ, làm client logout oan).
+    if (error instanceof Error && error.message === "TOKEN_INVALID") {
+      ApiResponse.error(res, HTTP_STATUS.UNAUTHORIZED, "Invalid access token", {
+        requestId: req.id,
+      });
+      return;
+    }
+    next(error);
   }
 };
 
 export const optionalAuth = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const token = req.headers.authorization;
+  const header = req.headers.authorization;
 
   // Không có token / sai format -> coi như khách vãng lai, cho qua luôn
-  if (!token || !token.startsWith("Bearer")) {
-    return next();
-  }
+  if (!hasBearer(header)) return next();
 
   try {
-    const accessToken = token.split(" ")[1];
-    const decoded = verifyAccessToken(accessToken);
-
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: decoded.id },
-      select: [
-        "id",
-        "name",
-        "email",
-        "role",
-        "avatar",
-        "resume",
-        "createdAt",
-        "updatedAt",
-      ],
-    });
-
-    if (user) {
-      req.user = user;
-    }
+    const { user, payload } = await authenticateAccessToken(header.split(" ")[1]);
+    req.tokenPayload = payload;
+    req.user = user;
   } catch {
-    // Token hết hạn / sai / bị chỉnh sửa -> im lặng bỏ qua, không throw 401
-    // Khác với `protect`: lỗi token ở đây không được phép chặn user xem trang public
+    // Token hết hạn / sai / bị thu hồi -> im lặng coi như khách vãng lai,
+    // không throw 401: lỗi token ở đây không được chặn user xem trang public.
   }
 
   next();

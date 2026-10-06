@@ -14,7 +14,12 @@ import {
   applicationRepository,
   ApplicationRepository,
 } from "../repositories/application.repository";
-import { MyApplicationsResult, TriggerAIAnalysisResult } from "../types/application.types";
+import { TriggerAIAnalysisResult } from "../types/application.types";
+import { ensureOwnership } from "../utils/authorization.util";
+import {
+  buildPaginatedResult,
+  PaginatedResult,
+} from "../utils/pagination.util";
 import { GetMyApplicationsQuery } from "../validators/application.validator";
 
 export class ApplicationService {
@@ -178,9 +183,11 @@ export class ApplicationService {
       throw new NotFoundError("Application not found");
     }
 
-    if (application.job.company.employerId !== employerId) {
-      throw new ForbiddenError("Not authorized to analyze this application");
-    }
+    ensureOwnership(
+      application.job.company.employerId,
+      employerId,
+      "Not authorized to analyze this application"
+    );
 
     if (!application.resume) {
       throw new BadRequestError("No resume found for this application");
@@ -214,19 +221,19 @@ export class ApplicationService {
   async getMyApplications(
     applicantId: string,
     pagination: GetMyApplicationsQuery
-  ): Promise<MyApplicationsResult> {
+  ): Promise<PaginatedResult<Application>> {
     const [applications, total] =
       await this.applicationRepo.findAndCountByApplicant(
         applicantId,
         pagination
       );
 
-    return {
+    return buildPaginatedResult(
       applications,
       total,
-      page: pagination.page,
-      totalPages: Math.ceil(total / pagination.limit),
-    };
+      pagination.page,
+      pagination.limit
+    );
   }
 
   /**
@@ -243,11 +250,11 @@ export class ApplicationService {
       throw new NotFoundError("Job not found");
     }
 
-    if (job.company.employerId !== employerId) {
-      throw new ForbiddenError(
-        "Not authorized to view applicants for this job"
-      );
-    }
+    ensureOwnership(
+      job.company.employerId,
+      employerId,
+      "Not authorized to view applicants for this job"
+    );
 
     return this.applicationRepo.findByJobExcludingWithdrawn(jobId);
   }
@@ -293,9 +300,11 @@ export class ApplicationService {
       throw new NotFoundError("Application not found");
     }
 
-    if (application.job.company.employerId !== employerId) {
-      throw new ForbiddenError("Not authorized to update this application");
-    }
+    ensureOwnership(
+      application.job.company.employerId,
+      employerId,
+      "Not authorized to update this application"
+    );
 
     const lockedStatuses = [
       ApplicationStatus.ACCEPTED,

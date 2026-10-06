@@ -5,12 +5,14 @@ import {
 } from "../controllers/group-chat.controller";
 import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
+import { idempotency } from "../middlewares/idempotency.middleware";
 import { ROUTES } from "../constants/routes";
 import {
   addMembersSchema,
   createGroupSchema,
   deleteGroupMessageSchema,
   getGroupMessagesSchema,
+  getUserGroupsSchema,
   groupIdParamSchema,
   memberActionParamsSchema,
   sendGroupMessageSchema,
@@ -25,8 +27,17 @@ router.use(protect);
 // match groupId = "invitations" and return the wrong handler.
 
 // Groups
-router.get("/", groupChatController.getUserGroups);
-router.post("/", validate(createGroupSchema), groupChatController.createGroup);
+router.get(
+  ROUTES.GROUPS.LIST,
+  validate(getUserGroupsSchema),
+  groupChatController.getUserGroups
+);
+router.post(
+  ROUTES.GROUPS.LIST,
+  idempotency(),
+  validate(createGroupSchema),
+  groupChatController.createGroup
+);
 
 // Invitations (static — before /:groupId)
 router.get(
@@ -68,6 +79,7 @@ router.get(
 );
 router.post(
   ROUTES.GROUPS.MESSAGES,
+  idempotency(),
   validate(sendGroupMessageSchema),
   groupChatController.sendGroupMessage
 );

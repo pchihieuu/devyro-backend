@@ -1,7 +1,8 @@
 import { Response } from "express";
 import { chatService } from "../services/chat.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
+import { HTTP_MESSAGE } from "../constants/httpStatus";
+import { ApiResponse } from "../utils/api-response";
 import { ValidatedRequest } from "../types/express";
 import {
   DeleteConversationParams,
@@ -25,10 +26,7 @@ export const sendMessage = asyncHandler<
     fileUrl,
   });
 
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    data: message,
-  });
+  ApiResponse.created(res, message);
 });
 
 export const getMessages = asyncHandler<
@@ -44,20 +42,14 @@ export const getMessages = asyncHandler<
     limit
   );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result,
-  });
+  ApiResponse.ok(res, result);
 });
 
 export const getConversations = asyncHandler(
   async (req, res: Response): Promise<void> => {
     const conversations = await chatService.getConversations(req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: conversations,
-    });
+    ApiResponse.ok(res, conversations);
   }
 );
 
@@ -67,10 +59,7 @@ export const markAsRead = asyncHandler<ValidatedRequest<MarkAsReadParams>>(
 
     await chatService.markAsRead(req.user!.id, otherUserId);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.UPDATED,
-    });
+    ApiResponse.message(res, HTTP_MESSAGE.UPDATED);
   }
 );
 
@@ -81,20 +70,14 @@ export const deleteMessage = asyncHandler<
 
   await chatService.deleteMessage(messageId, req.user!.id);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: HTTP_MESSAGE.DELETED,
-  });
+  ApiResponse.message(res, HTTP_MESSAGE.DELETED);
 });
 
 export const getUnreadCount = asyncHandler(
   async (req, res: Response): Promise<void> => {
     const count = await chatService.getUnreadCount(req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: { count },
-    });
+    ApiResponse.ok(res, { count });
   }
 );
 
@@ -108,10 +91,7 @@ export const startConversation = asyncHandler<
     otherUserId
   );
 
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    data: conversation,
-  });
+  ApiResponse.created(res, conversation);
 });
 
 export const deleteConversation = asyncHandler<
@@ -121,8 +101,5 @@ export const deleteConversation = asyncHandler<
 
   await chatService.deleteConversation(req.user!.id, otherUserId);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: HTTP_MESSAGE.DELETED,
-  });
+  ApiResponse.message(res, HTTP_MESSAGE.DELETED);
 });

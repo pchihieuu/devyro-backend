@@ -19,6 +19,7 @@ import {
   updateJobSchema,
 } from "../validators/job.validator";
 import { validate } from "../middlewares/validation.middleware";
+import { idempotency } from "../middlewares/idempotency.middleware";
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.patch(
 
 router
   .route("/")
-  .post(protect, validate(createJobSchema), createJob)
+  .post(protect, idempotency(), validate(createJobSchema), createJob)
   .get(optionalAuth, validate(getJobsSchema), getJobs);
 
 router

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { idempotency } from "../middlewares/idempotency.middleware";
 import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
 import {
@@ -25,6 +26,7 @@ const router = Router();
 router.post(
   ROUTES.APPLICATIONS.APPLY_JOB,
   protect,
+  idempotency(),
   validate(applyToJobSchema),
   applyToJob
 );

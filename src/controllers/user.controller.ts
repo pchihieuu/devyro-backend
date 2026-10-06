@@ -1,8 +1,8 @@
 import { Response } from "express";
 import { userService } from "../services/user.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
-import { sendPaginated } from "../utils/http-response.util";
+import { HTTP_MESSAGE } from "../constants/httpStatus";
+import { ApiResponse } from "../utils/api-response";
 
 import {
   UpdateProfileBody,
@@ -24,21 +24,14 @@ export const updateProfile = asyncHandler<
 >(async (req, res: Response): Promise<void> => {
   const user = await userService.updateProfile(req.user!.id, req.body);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: HTTP_MESSAGE.UPDATED,
-    data: user,
-  });
+  ApiResponse.ok(res, user, HTTP_MESSAGE.UPDATED);
 });
 
 export const deleteResume = asyncHandler(
   async (req, res: Response): Promise<void> => {
     await userService.deleteResume(req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.DELETED,
-    });
+    ApiResponse.message(res, HTTP_MESSAGE.DELETED);
   }
 );
 
@@ -49,20 +42,14 @@ export const getPublicProfile = asyncHandler<
   const viewer = req.user ? {id: req.user.id, role: req.user.role} : undefined;
   const user = await userService.getPublicProfile(id, viewer);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: user,
-  });
+  ApiResponse.ok(res, user);
 });
 
 export const getMyProfile = asyncHandler(
   async (req, res: Response): Promise<void> => {
     const user = await userService.getMyProfile(req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: user,
-    });
+    ApiResponse.ok(res, user);
   }
 );
 
@@ -79,7 +66,7 @@ export const searchUsers = asyncHandler<
     skills
   );
 
-  sendPaginated(res, result);
+  ApiResponse.paginated(res, result);
 });
 
 export const addExperience = asyncHandler<
@@ -87,11 +74,7 @@ export const addExperience = asyncHandler<
 >(async (req, res: Response): Promise<void> => {
   const user = await userService.addExperience(req.user!.id, req.body);
 
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    message: "Experience added successfully",
-    data: user.experience,
-  });
+  ApiResponse.created(res, user.experience, "Experience added successfully");
 });
 
 export const updateExperience = asyncHandler<
@@ -100,11 +83,7 @@ export const updateExperience = asyncHandler<
   const { id } = req.validatedParams;
   const user = await userService.updateExperience(req.user!.id, id, req.body);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Experience updated successfully",
-    data: user.experience,
-  });
+  ApiResponse.ok(res, user.experience, "Experience updated successfully");
 });
 
 export const deleteExperience = asyncHandler<
@@ -113,11 +92,7 @@ export const deleteExperience = asyncHandler<
   const { id } = req.validatedParams;
   const user = await userService.deleteExperience(req.user!.id, id);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Experience deleted successfully",
-    data: user.experience,
-  });
+  ApiResponse.ok(res, user.experience, "Experience deleted successfully");
 });
 
 export const addProject = asyncHandler<
@@ -125,11 +100,7 @@ export const addProject = asyncHandler<
 >(async (req, res: Response): Promise<void> => {
   const user = await userService.addProject(req.user!.id, req.body);
 
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    message: "Project added successfully",
-    data: user.projects,
-  });
+  ApiResponse.created(res, user.projects, "Project added successfully");
 });
 
 export const updateProject = asyncHandler<
@@ -138,11 +109,7 @@ export const updateProject = asyncHandler<
   const { id } = req.validatedParams;
   const user = await userService.updateProject(req.user!.id, id, req.body);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Project updated successfully",
-    data: user.projects,
-  });
+  ApiResponse.ok(res, user.projects, "Project updated successfully");
 });
 
 export const deleteProject = asyncHandler<
@@ -151,9 +118,5 @@ export const deleteProject = asyncHandler<
   const { id } = req.validatedParams;
   const user = await userService.deleteProject(req.user!.id, id);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Project deleted successfully",
-    data: user.projects,
-  });
+  ApiResponse.ok(res, user.projects, "Project deleted successfully");
 });

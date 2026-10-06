@@ -1,24 +1,18 @@
 import { Request, Response } from "express";
 import { analyticsService } from "../services/analytics.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { ForbiddenError } from "../utils/errors";
-import { UserRole } from "../entities/User.entity";
-import { HTTP_STATUS } from "../constants/httpStatus";
+import { ApiResponse } from "../utils/api-response";
 
 export const getEmployerAnalytics = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    if (req.user!.role !== UserRole.EMPLOYER) {
-      throw new ForbiddenError("Access denied");
-    }
-
     const analytics = await analyticsService.getEmployerAnalytics(
-      req.user!.id
+      req.user!.id,
+      req.user!.role
     );
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      counts: analytics.counts,
-      data: analytics,
+    // `counts` giữ ở top-level vì FE cũ đọc trực tiếp res.counts.
+    ApiResponse.ok(res, analytics, undefined, {
+      extra: { counts: analytics.counts },
     });
   }
 );

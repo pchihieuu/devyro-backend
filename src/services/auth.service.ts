@@ -5,26 +5,64 @@ import {
   TokenPayload,
 } from "../utils/token.utils";
 import { PasswordUtils } from "../utils/password.utils";
-import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from "../utils/errors";
+import {
+  ConflictError,
+  UnauthorizedError,
+  NotFoundError,
+  BadRequestError,
+} from "../utils/errors";
 import { emailService } from "./email.service";
 import crypto from "crypto";
 import { User, UserRole } from "../entities/User.entity";
 import { PasswordResetToken } from "../entities/Passwordresettoken.entity";
-import { authRepository, AuthRepository } from "../repositories/auth.repository";
-import { sessionRepository, SessionRepository, ActiveSession } from "../repositories/session.repository";
+import {
+  authRepository,
+  AuthRepository,
+} from "../repositories/auth.repository";
+import {
+  sessionRepository,
+  SessionRepository,
+  ActiveSession,
+} from "../repositories/session.repository";
 import { JwtPayload } from "../types/express";
 
-interface RegisterData { name: string; email: string; password: string; avatar?: string; role: UserRole; }
-interface LoginData { email: string; password: string; deviceInfo?: string; ipAddress?: string; }
-
-interface AuthResponse {
-  id: string; name: string; email: string; avatar: string; role: UserRole;
-  accessToken: string; refreshToken: string; resume: string;
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  avatar?: string;
+  role: UserRole;
+}
+interface LoginData {
+  email: string;
+  password: string;
+  deviceInfo?: string;
+  ipAddress?: string;
 }
 
-interface RefreshTokenData { refreshToken: string; deviceInfo?: string; ipAddress?: string; }
-interface ForgotPasswordData { email: string; }
-interface ResetPasswordData { token: string; newPassword: string; }
+interface AuthResponse {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: UserRole;
+  accessToken: string;
+  refreshToken: string;
+  resume: string;
+}
+
+interface RefreshTokenData {
+  refreshToken: string;
+  deviceInfo?: string;
+  ipAddress?: string;
+}
+interface ForgotPasswordData {
+  email: string;
+}
+interface ResetPasswordData {
+  token: string;
+  newPassword: string;
+}
 
 type AccessTokenContext = TokenPayload & { jti?: string; exp?: number };
 
@@ -36,14 +74,25 @@ export class AuthService {
 
   // ==================== Authentication ====================
 
-  async register(data: RegisterData, deviceInfo?: string, ipAddress?: string): Promise<AuthResponse> {
+  async register(
+    data: RegisterData,
+    deviceInfo?: string,
+    ipAddress?: string
+  ): Promise<AuthResponse> {
     const { name, email, password, avatar, role } = data;
 
     const existingUser = await this.authRepo.findUserByEmail(email);
-    if (existingUser) throw new ConflictError("User with this email already exists");
+    if (existingUser)
+      throw new ConflictError("User with this email already exists");
 
     const hashedPassword = await PasswordUtils.hash(password);
-    const user = await this.authRepo.createUser({ name, email, password: hashedPassword, avatar, role });
+    const user = await this.authRepo.createUser({
+      name,
+      email,
+      password: hashedPassword,
+      avatar,
+      role,
+    });
 
     this.sendWelcomeEmailAsync(user.email, user.name);
 
@@ -56,8 +105,12 @@ export class AuthService {
     const user = await this.authRepo.findUserByEmailForLogin(email);
     if (!user) throw new UnauthorizedError("Invalid email or password");
 
-    const isPasswordValid = await PasswordUtils.compare(password, user.password);
-    if (!isPasswordValid) throw new UnauthorizedError("Invalid email or password");
+    const isPasswordValid = await PasswordUtils.compare(
+      password,
+      user.password
+    );
+    if (!isPasswordValid)
+      throw new UnauthorizedError("Invalid email or password");
 
     return this.buildAuthResponse(user, deviceInfo, ipAddress);
   }
@@ -68,7 +121,9 @@ export class AuthService {
    * 2. Check jti còn tồn tại trong Redis (chưa bị revoke/rotate trước đó).
    * 3. Nếu hợp lệ: xóa session cũ, cấp access token + refresh token (jti) mới, lưu session mới.
    */
-  async refreshAccessToken(data: RefreshTokenData): Promise<{ accessToken: string; refreshToken: string }> {
+  async refreshAccessToken(
+    data: RefreshTokenData
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const { refreshToken: token, deviceInfo, ipAddress } = data;
 
     let decoded: JwtPayload;
@@ -82,10 +137,15 @@ export class AuthService {
       throw new UnauthorizedError("Malformed refresh token");
     }
 
-    const isValid = await this.sessionRepo.isRefreshSessionValid(decoded.id, decoded.jti);
+    const isValid = await this.sessionRepo.isRefreshSessionValid(
+      decoded.id,
+      decoded.jti
+    );
     if (!isValid) {
       // jti không còn trong Redis -> đã logout / đã rotate / bị revoke thủ công
-      throw new UnauthorizedError("Refresh token not found or has been revoked");
+      throw new UnauthorizedError(
+        "Refresh token not found or has been revoked"
+      );
     }
 
     const user = await this.authRepo.findUserById(decoded.id);
@@ -94,14 +154,26 @@ export class AuthService {
     // Rotation: hủy session cũ trước khi cấp session mới, tránh 1 refresh token dùng được nhiều lần
     await this.sessionRepo.revokeRefreshSession(decoded.id, decoded.jti);
 
-    const tokens = generateTokens({ id: user.id, email: user.email, role: user.role });
-
-    await this.sessionRepo.storeRefreshSession(user.id, tokens.refreshJti, tokens.refreshExpiresInSeconds, {
-      deviceInfo,
-      ipAddress,
+    const tokens = generateTokens({
+      id: user.id,
+      email: user.email,
+      role: user.role,
     });
 
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
+    await this.sessionRepo.storeRefreshSession(
+      user.id,
+      tokens.refreshJti,
+      tokens.refreshExpiresInSeconds,
+      {
+        deviceInfo,
+        ipAddress,
+      }
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   // ==================== Logout ====================
@@ -111,7 +183,11 @@ export class AuthService {
    * Cho phép logout kể cả khi refresh token đã hết hạn (verify fail) bằng cách fallback decode
    * (không verify) để vẫn lấy được jti và dọn key — tránh rác vĩnh viễn nếu client gọi logout trễ.
    */
-  async logout(userId: string, refreshToken: string, accessTokenContext?: AccessTokenContext): Promise<void> {
+  async logout(
+    userId: string,
+    refreshToken: string,
+    accessTokenContext?: AccessTokenContext
+  ): Promise<void> {
     let jti: string | undefined;
     try {
       jti = (verifyRefreshToken(refreshToken) as JwtPayload).jti;
@@ -125,7 +201,10 @@ export class AuthService {
 
     if (accessTokenContext?.jti && accessTokenContext.exp) {
       const ttlSeconds = accessTokenContext.exp - Math.floor(Date.now() / 1000);
-      await this.sessionRepo.blacklistAccessToken(accessTokenContext.jti, ttlSeconds);
+      await this.sessionRepo.blacklistAccessToken(
+        accessTokenContext.jti,
+        ttlSeconds
+      );
     }
   }
 
@@ -142,7 +221,10 @@ export class AuthService {
   }
 
   async revokeSession(userId: string, tokenId: string): Promise<void> {
-    const isValid = await this.sessionRepo.isRefreshSessionValid(userId, tokenId);
+    const isValid = await this.sessionRepo.isRefreshSessionValid(
+      userId,
+      tokenId
+    );
     if (!isValid) throw new NotFoundError("Session not found");
 
     await this.sessionRepo.revokeRefreshSession(userId, tokenId);
@@ -166,7 +248,12 @@ export class AuthService {
     expiresAt.setHours(expiresAt.getHours() + 1);
 
     await this.authRepo.invalidateExistingResetTokens(user.id);
-    await this.authRepo.createResetToken({ token: hashedToken, userId: user.id, expiresAt, isUsed: false });
+    await this.authRepo.createResetToken({
+      token: hashedToken,
+      userId: user.id,
+      expiresAt,
+      isUsed: false,
+    });
     await this.sendPasswordResetEmailAsync(user.email, user.name, resetToken);
   }
 
@@ -216,18 +303,33 @@ export class AuthService {
 
   async cleanupExpiredResetTokens(): Promise<void> {
     const result = await this.authRepo.deleteExpiredResetTokens();
-    console.log(`Cleaned up ${result.affected || 0} expired/used password reset tokens`);
+    console.log(
+      `Cleaned up ${result.affected || 0} expired/used password reset tokens`
+    );
   }
 
   // ==================== Private Helper Methods ====================
 
-  private async buildAuthResponse(user: User, deviceInfo?: string, ipAddress?: string): Promise<AuthResponse> {
-    const tokens = generateTokens({ id: user.id, email: user.email, role: user.role });
-
-    await this.sessionRepo.storeRefreshSession(user.id, tokens.refreshJti, tokens.refreshExpiresInSeconds, {
-      deviceInfo,
-      ipAddress,
+  private async buildAuthResponse(
+    user: User,
+    deviceInfo?: string,
+    ipAddress?: string
+  ): Promise<AuthResponse> {
+    const tokens = generateTokens({
+      id: user.id,
+      email: user.email,
+      role: user.role,
     });
+
+    await this.sessionRepo.storeRefreshSession(
+      user.id,
+      tokens.refreshJti,
+      tokens.refreshExpiresInSeconds,
+      {
+        deviceInfo,
+        ipAddress,
+      }
+    );
 
     return {
       id: user.id,
@@ -249,13 +351,20 @@ export class AuthService {
     return crypto.createHash("sha256").update(token).digest("hex");
   }
 
-  private async findAndValidateResetToken(token: string): Promise<PasswordResetToken> {
+  private async findAndValidateResetToken(
+    token: string
+  ): Promise<PasswordResetToken> {
     const hashedToken = this.hashToken(token);
     const resetToken = await this.authRepo.findResetTokenByHash(hashedToken);
 
-    if (!resetToken) throw new BadRequestError("Invalid or expired password reset token");
-    if (resetToken.isUsed) throw new BadRequestError("This password reset token has already been used");
-    if (new Date() > resetToken.expiresAt) throw new BadRequestError("Password reset token has expired");
+    if (!resetToken)
+      throw new BadRequestError("Invalid or expired password reset token");
+    if (resetToken.isUsed)
+      throw new BadRequestError(
+        "This password reset token has already been used"
+      );
+    if (new Date() > resetToken.expiresAt)
+      throw new BadRequestError("Password reset token has expired");
 
     return resetToken;
   }
@@ -266,18 +375,27 @@ export class AuthService {
     });
   }
 
-  private async sendPasswordResetEmailAsync(email: string, name: string, token: string): Promise<void> {
+  private async sendPasswordResetEmailAsync(
+    email: string,
+    name: string,
+    token: string
+  ): Promise<void> {
     try {
       await emailService.sendPasswordResetEmail(email, name, token);
     } catch (error) {
       console.error(`Failed to send password reset email to ${email}:`, error);
-      throw new Error("Failed to send password reset email. Please try again later.");
+      throw new Error(
+        "Failed to send password reset email. Please try again later."
+      );
     }
   }
 
   private sendPasswordChangedEmailAsync(email: string, name: string): void {
     emailService.sendPasswordChangedEmail(email, name).catch((error) => {
-      console.error(`Failed to send password changed email to ${email}:`, error);
+      console.error(
+        `Failed to send password changed email to ${email}:`,
+        error
+      );
     });
   }
 }
