@@ -67,7 +67,17 @@ interface RedisConfig {
   tls: boolean;
 }
 
+/**
+ * Timeout (ms) cho external call. Không có giá trị này, Cloudinary/SMTP treo
+ * sẽ giữ request (và socket) vô thời hạn.
+ */
+interface TimeoutConfig {
+  cloudinaryMs: number;
+  emailMs: number;
+}
+
 interface AppConfig {
+  timeouts: TimeoutConfig;
   database: DatabaseConfig;
   jwt: JwtConfig;
   cloudinary: CloudinaryConfig;
@@ -110,7 +120,16 @@ const validateEnv = (): void => {
 
 validateEnv();
 
+const positiveInt = (value: string | undefined, fallback: number): number => {
+  const n = parseInt(value ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 export const config: AppConfig = {
+  timeouts: {
+    cloudinaryMs: positiveInt(process.env.CLOUDINARY_TIMEOUT_MS, 60_000),
+    emailMs: positiveInt(process.env.EMAIL_TIMEOUT_MS, 15_000),
+  },
   database: {
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "5432", 10),

@@ -1,7 +1,4 @@
-import {
-  AIMatchingAnalysis,
-  Application,
-} from "../entities/Application.entity";
+import { AIMatchingAnalysis } from "../entities/Application.entity";
 
 export type ApplicationAiAnalysisResult = {
   score: number;
@@ -12,11 +9,4 @@ export type ApplicationAiAnalysisResult = {
 export interface TriggerAIAnalysisResult {
   message: string;
   analysis?: ApplicationAiAnalysisResult;
-}
-
-export interface MyApplicationsResult {
-  applications: Application[];
-  total: number;
-  page: number;
-  totalPages: number;
 }

@@ -1,11 +1,11 @@
-import { v2 as cloudinary } from "cloudinary";
+import cloudinary from "../config/cloudinary.config";
+import { config } from "../config/env.config";
 import { BadRequestError } from "../utils/errors";
+import { withTimeout } from "./timeout.util";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Dùng chung instance đã cấu hình ở config/cloudinary.config — file này từng tự
+// gọi cloudinary.config() bằng process.env lần thứ 2 (2 nơi cấu hình cùng 1 SDK
+// singleton dễ lệch nhau và ghi đè lẫn nhau).
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
 const ALLOWED_FILE_TYPES = [
@@ -59,7 +59,7 @@ export async function uploadChatMedia(
     throw new BadRequestError(`Unsupported file type: ${mimeType}`);
   }
 
-  return new Promise((resolve, reject) => {
+  const upload = new Promise<UploadedMedia>((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
         {
@@ -67,6 +67,7 @@ export async function uploadChatMedia(
           folder,
           use_filename: true,
           unique_filename: true,
+          timeout: config.timeouts.cloudinaryMs,
         },
         (error, result) => {
           if (error || !result) {
@@ -84,6 +85,8 @@ export async function uploadChatMedia(
       )
       .end(buffer);
   });
+
+  return withTimeout(upload, config.timeouts.cloudinaryMs, "Cloudinary upload");
 }
 
 export async function deleteChatMedia(
@@ -91,7 +94,13 @@ export async function deleteChatMedia(
   resourceType: "image" | "raw" | "video" = "image"
 ): Promise<void> {
   try {
-    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    await withTimeout(
+      cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType,
+      }),
+      config.timeouts.cloudinaryMs,
+      "Cloudinary delete"
+    );
   } catch (err) {
     console.error("Cloudinary delete error:", err);
   }

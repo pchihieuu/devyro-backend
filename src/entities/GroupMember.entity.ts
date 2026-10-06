@@ -33,6 +33,7 @@ export enum MemberStatus {
 @Entity("group_members")
 @Index("IDX_group_members_group_user", ["groupId", "userId"], { unique: true })
 @Index("IDX_group_members_group_status", ["groupId", "status"])
+@Index("IDX_group_members_user_status", ["userId", "status"])
 export class GroupMember {
   @PrimaryGeneratedColumn("uuid")
   id: string;

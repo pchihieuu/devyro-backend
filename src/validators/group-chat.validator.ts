@@ -62,15 +62,31 @@ export const updateGroupSchema = z.object({
 export type UpdateGroupParams = z.infer<typeof updateGroupSchema>["params"];
 export type UpdateGroupBody = z.infer<typeof updateGroupSchema>["body"];
 
+// Dùng chung cho filter `search` — trim + giới hạn độ dài để chặn ILIKE pattern
+// quá dài; chuỗi rỗng coi như không lọc.
+const searchField = z
+  .string()
+  .trim()
+  .max(100, "Search keyword must not exceed 100 characters")
+  .optional()
+  .transform((v) => v || undefined);
+
+export const getUserGroupsSchema = z.object({
+  query: z.object({ search: searchField }),
+});
+export type GetUserGroupsQuery = z.infer<typeof getUserGroupsSchema>["query"];
+
 export const getGroupMessagesSchema = z.object({
   params: groupIdParam,
   // sortBy/order don't apply here (messages are always newest-first,
   // paginated backwards) — reuse the shared pagination primitives for
   // page/limit only rather than redefining them.
-  query: createPaginationSchema(["createdAt"], "createdAt").pick({
-    page: true,
-    limit: true,
-  }),
+  query: createPaginationSchema(["createdAt"], "createdAt")
+    .pick({
+      page: true,
+      limit: true,
+    })
+    .extend({ search: searchField }),
 });
 export type GetGroupMessagesParams = z.infer<
   typeof getGroupMessagesSchema
