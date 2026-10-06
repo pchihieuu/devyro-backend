@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { config } from "./env.config";
+import { instrumentRedis } from "../observability/redis-instrumentation";
 
 class RedisConnection {
   private static instance: Redis;
@@ -22,3 +23,4 @@ class RedisConnection {
 }
 
 export const redisClient = RedisConnection.getInstance();
+instrumentRedis(redisClient);
