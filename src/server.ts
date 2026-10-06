@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// Sentry PHẢI init trước khi require express/pg/ioredis để auto-instrumentation
+// gắn được. No-op nếu không đặt SENTRY_DSN.
+// OTel PHẢI đứng đầu tiên (patch http/express/pg/ioredis), rồi tới Sentry.
+import { shutdownTracing } from "./observability/tracing";
+import { captureError, flushSentry } from "./observability/sentry";
 import "reflect-metadata";
 import app from "./app";
 import {
@@ -10,6 +15,7 @@ import {
 import { initializeWebSocket } from "./services/websocket.service";
 import { mqService } from "./services/message-queue.service";
 import { startAllWorkers } from "./workers/chat";
+import { outboxRelay } from "./workers/outbox-relay";
 import { createServer } from "http";
 import { setupScheduledJobs } from "./jobs/scheduledJobs";
 
@@ -33,6 +39,10 @@ const startServer = async () => {
     // 4. Start tất cả consumer workers
     await startAllWorkers();
 
+    // 4b. Outbox relay — publish các event đã commit (vd tin nhắn group) ra MQ.
+    // Phải sau khi MQ + workers sẵn sàng.
+    outboxRelay.start();
+
     // 5. Scheduled jobs
     setupScheduledJobs();
 
@@ -49,9 +59,13 @@ const startServer = async () => {
         console.log("HTTP server closed.");
 
         try {
+          // Dừng relay trước (đợi vòng đang publish xong), rồi mới đóng MQ
+          await outboxRelay.stop();
           // Đóng MQ trước để workers không nhận message mới
           await mqService.close();
           await closeDatabase();
+          await flushSentry();
+          await shutdownTracing();
           console.log("Shutdown complete.");
           process.exit(0);
         } catch (error) {
@@ -73,6 +87,7 @@ const startServer = async () => {
     // Bắt unhandled rejection để không crash server im lặng
     process.on("unhandledRejection", (reason) => {
       console.error("Unhandled Rejection:", reason);
+      captureError(reason);
     });
   } catch (error) {
     console.error("Failed to start server:", error);

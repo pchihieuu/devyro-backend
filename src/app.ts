@@ -4,6 +4,7 @@ import cors from "cors";
 import morgan from "morgan";
 import { logger, morganStream } from "./utils/logger";
 import { requestId } from "./middlewares/requestId.middleware";
+import { requestContext } from "./observability/request-context";
 import { apiLimiter } from "./middlewares/rateLimiter.middleware";
 import authRoutes from "./routes/auth.route";
 import userRoutes from "./routes/user.route";
@@ -28,6 +29,10 @@ const app: Express = express();
 // Must run before everything else — every log line and error response
 // downstream (including inside setupMetrics/helmet) can reference req.id.
 app.use(requestId);
+
+// Mở AsyncLocalStorage cho từng request (requestId + đếm SQL) — dùng để gắn
+// requestId vào log slow-query và phát hiện N+1. Phải nằm ngay sau requestId.
+app.use(requestContext);
 
 setupMetrics(app);
 
@@ -76,8 +81,15 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["set-cookie"],
+    // X-Request-Id: LB/gateway hoặc FE có thể gửi để nối trace (requestId.middleware
+    // đọc header này) — thiếu ở allowedHeaders thì preflight của browser sẽ chặn.
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Idempotency-Key",
+      "X-Request-Id",
+    ],
+    exposedHeaders: ["set-cookie", "X-Request-Id", "Idempotency-Replayed"],
   })
 );
 
