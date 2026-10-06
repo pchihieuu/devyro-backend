@@ -29,7 +29,7 @@ export class GroupMessage {
   groupId: string;
 
   @Column({ type: "uuid", name: "sender_id" })
-  @Index()
+  @Index("IDX_group_messages_senderId")
   senderId: string;
 
   @Column({ type: "text", nullable: true })

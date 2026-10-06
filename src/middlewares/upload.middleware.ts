@@ -1,5 +1,5 @@
-import multer, { FileFilterCallback } from 'multer';
-import { Request } from 'express';
+import multer, { FileFilterCallback } from "multer";
+import { Request } from "express";
 
 const storage = multer.memoryStorage();
 
@@ -9,18 +9,16 @@ const fileFilter = (
   cb: FileFilterCallback
 ): void => {
   const allowedTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'application/pdf',
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "application/pdf",
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(
-      new Error('Only .jpeg, .jpg, .png, and .pdf formats are allowed')
-    );
+    cb(new Error("Only .jpeg, .jpg, .png, and .pdf formats are allowed"));
   }
 };
 

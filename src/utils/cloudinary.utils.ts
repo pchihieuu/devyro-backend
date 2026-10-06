@@ -1,4 +1,6 @@
 import cloudinary from "../config/cloudinary.config";
+import { config } from "../config/env.config";
+import { withTimeout } from "./timeout.util";
 import streamifier from "streamifier";
 import { UploadApiResponse, UploadApiOptions } from "cloudinary";
 
@@ -10,11 +12,12 @@ export const uploadToCloudinary = (
   folder: string,
   resourceType: "image" | "raw" = "image"
 ): Promise<UploadApiResponse> => {
-  return new Promise((resolve, reject) => {
+  const upload = new Promise<UploadApiResponse>((resolve, reject) => {
     const uploadOptions: UploadApiOptions = {
       folder: folder,
       resource_type: resourceType,
       access_mode: "public",
+      timeout: config.timeouts.cloudinaryMs, // timeout native của SDK
     };
 
     if (resourceType === "raw") {
@@ -34,6 +37,9 @@ export const uploadToCloudinary = (
 
     streamifier.createReadStream(fileBuffer).pipe(uploadStream);
   });
+
+  // Chốt chặn cứng phía ngoài: SDK có thể không huỷ được stream đang treo.
+  return withTimeout(upload, config.timeouts.cloudinaryMs, "Cloudinary upload");
 };
 
 /**
@@ -44,9 +50,13 @@ export const deleteFromCloudinary = async (
   resourceType: "image" | "raw" = "image"
 ): Promise<any> => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: resourceType,
-    });
+    const result = await withTimeout(
+      cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType,
+      }),
+      config.timeouts.cloudinaryMs,
+      "Cloudinary delete"
+    );
     return result;
   } catch (error) {
     throw error;

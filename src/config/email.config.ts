@@ -11,6 +11,10 @@ class EmailConfig {
       host: config.email.host,
       port: config.email.port,
       secure: config.email.secure,
+      // Không đặt các timeout này thì SMTP treo = sendMail treo vô thời hạn.
+      connectionTimeout: config.timeouts.emailMs,
+      greetingTimeout: config.timeouts.emailMs,
+      socketTimeout: config.timeouts.emailMs,
       auth: {
         user: config.email.user,
         pass: config.email.password,

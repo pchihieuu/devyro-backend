@@ -18,10 +18,14 @@ import { Group } from "../entities/Group.entity";
 import { GroupMember } from "../entities/GroupMember.entity";
 import { GroupMessage } from "../entities/GroupMessage.entity";
 import { GroupMessageSeen } from "../entities/GroupMessageSeen.entity";
+import { OutboxEvent } from "../entities/OutboxEvent.entity";
 
 const isProduction = config.nodeEnv === "production";
 
-const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+const parsePositiveInt = (
+  value: string | undefined,
+  fallback: number
+): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
@@ -78,6 +82,7 @@ const developmentConfig: DataSourceOptions = {
     GroupMember,
     GroupMessage,
     GroupMessageSeen,
+    OutboxEvent,
   ],
   migrations: ["src/migrations/**/*.ts"],
 } as DataSourceOptions;
