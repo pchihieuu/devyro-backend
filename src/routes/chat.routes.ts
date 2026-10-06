@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { idempotency } from "../middlewares/idempotency.middleware";
 import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
 import {
@@ -19,6 +20,7 @@ router.get(ROUTES.CHAT.CONVERSATIONS, protect, getConversations);
 router.post(
   ROUTES.CHAT.START_CONVERSATION,
   protect,
+  idempotency(),
   validate(startConversationSchema),
   startConversation
 );
@@ -35,6 +37,7 @@ router.get(
 router.post(
   ROUTES.CHAT.MESSAGES,
   protect,
+  idempotency(),
   validate(sendMessageSchema),
   sendMessage
 );

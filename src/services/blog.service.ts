@@ -33,15 +33,36 @@ export class BlogService {
     return slugify(text, { lower: true, strict: true, locale: "vi" });
   }
 
+  /**
+   * Batch: 1 query lấy tag có sẵn + tối đa 1 insert + 1 query đọc lại, thay
+   * cho vòng for tuần tự (2 query/tag).
+   * Cũng sửa 2 lỗi của bản cũ: (1) 2 tên khác nhau cùng ra 1 slug ("C#", "C++")
+   * bị push trùng tag vào bài viết → duplicate key ở bảng join; (2) 2 request
+   * cùng tạo tag mới → unique-violation 500.
+   */
   private async findOrCreateTags(names: string[]): Promise<BlogTag[]> {
-    const tags: BlogTag[] = [];
-    for (const name of names) {
+    const wanted = new Map<string, string>(); // slug -> tên hiển thị
+    for (const raw of names) {
+      const name = raw.trim();
       const slug = this.makeSlug(name);
-      let tag = await this.blogRepo.findTagBySlug(slug);
-      if (!tag) tag = await this.blogRepo.createTag(name.trim(), slug);
-      tags.push(tag);
+      if (slug && !wanted.has(slug)) wanted.set(slug, name);
     }
-    return tags;
+    const slugs = [...wanted.keys()];
+    if (slugs.length === 0) return [];
+
+    let tags = await this.blogRepo.findTagsBySlugs(slugs);
+    const found = new Set(tags.map((t) => t.slug));
+    const missing = slugs.filter((s) => !found.has(s));
+
+    if (missing.length > 0) {
+      await this.blogRepo.insertTagsIgnoreConflict(
+        missing.map((slug) => ({ slug, name: wanted.get(slug)! }))
+      );
+      tags = await this.blogRepo.findTagsBySlugs(slugs);
+    }
+
+    const bySlug = new Map(tags.map((t) => [t.slug, t]));
+    return slugs.map((s) => bySlug.get(s)).filter((t): t is BlogTag => !!t);
   }
 
   private async uniqueSlug(title: string, excludeId?: string): Promise<string> {

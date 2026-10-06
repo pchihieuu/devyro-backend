@@ -1,5 +1,6 @@
 import { emailConfig } from "../config/email.config";
 import { config } from "../config/env.config";
+import { withTimeout } from "../utils/timeout.util";
 import { EmailAttachment, EmailTemplates } from "../templates/email.templates";
 
 export interface SendEmailOptions {
@@ -38,7 +39,11 @@ class EmailService {
     };
 
     try {
-      const info = await transporter.sendMail(mailOptions);
+      const info = await withTimeout(
+        transporter.sendMail(mailOptions),
+        config.timeouts.emailMs,
+        "SMTP sendMail"
+      );
       console.log(
         `Email sent successfully to ${options.to} (Message ID: ${info.messageId})`
       );

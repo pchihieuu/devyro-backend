@@ -1,8 +1,8 @@
+import { isUniqueViolation } from "../utils/db-error.util";
 import { AppDataSource } from "../config/database.config";
 import { Conversation } from "../entities/Conversation.entity";
 
 /** Postgres unique_violation error code */
-const UNIQUE_VIOLATION = "23505";
 
 export class ConversationRepository {
   private repo = AppDataSource.getRepository(Conversation);
@@ -46,8 +46,8 @@ export class ConversationRepository {
 
     try {
       return await this.repo.save(this.repo.create({ user1Id, user2Id }));
-    } catch (error: any) {
-      if (error?.code === UNIQUE_VIOLATION) {
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) {
         const conversation = await this.repo.findOne({
           where: { user1Id, user2Id },
         });

@@ -1,9 +1,8 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { blogService } from "../services/blog.service";
 import { blogCategoryService } from "../services/blogCategory.service";
 import { uploadService } from "../services/upload.service";
-import { HTTP_STATUS } from "../constants/httpStatus";
 import { BadRequestError } from "../utils/errors";
 import {
   AdminListPostsQuery,
@@ -20,21 +19,19 @@ import {
   UpdatePostParams,
 } from "../validators/blog.validator";
 import { ValidatedRequest } from "../types/express";
-import { buildPaginationMeta } from "../utils/pagination.util";
+import { ApiResponse } from "../utils/api-response";
 
-const getIp = (req: { headers: any; socket: any }): string | undefined =>
-  (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-  req.socket.remoteAddress;
+// Dùng req.ip (Express tự xử lý X-Forwarded-For theo cấu hình `trust proxy`).
+// Bản cũ đọc thẳng header x-forwarded-for → client tự gửi header giả là qua mặt
+// được chống đếm trùng lượt xem (view inflation).
+const getIp = (req: Request): string | undefined =>
+  req.ip ?? req.socket.remoteAddress;
 
 // Public
 export const listPosts = asyncHandler<ValidatedRequest<never, ListPostsQuery>>(
   async (req, res: Response) => {
     const result = await blogService.listPublished(req.validatedQuery);
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: result.items,
-      pagination: buildPaginationMeta(result),
-    });
+    ApiResponse.paginated(res, result);
   }
 );
 
@@ -46,14 +43,14 @@ export const getPost = asyncHandler<ValidatedRequest<GetBySlugParams>>(
       req.user?.id,
       req.headers["user-agent"]
     );
-    res.status(HTTP_STATUS.OK).json({ success: true, data: post });
+    ApiResponse.ok(res, post);
   }
 );
 
 export const getRelatedPosts = asyncHandler<ValidatedRequest<PostIdParams>>(
   async (req, res: Response) => {
     const posts = await blogService.getRelated(req.validatedParams.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, data: posts });
+    ApiResponse.ok(res, posts);
   }
 );
 
@@ -62,12 +59,12 @@ export const getLatestPosts = asyncHandler<
 >(async (req, res: Response) => {
   const limit = Math.min(+req.validatedQuery.limit, 20);
   const posts = await blogService.getLatest(limit);
-  res.status(HTTP_STATUS.OK).json({ success: true, data: posts });
+  ApiResponse.ok(res, posts);
 });
 
 export const listCategories = asyncHandler(async (_req, res: Response) => {
   const cats = await blogCategoryService.list();
-  res.status(HTTP_STATUS.OK).json({ success: true, data: cats });
+  ApiResponse.ok(res, cats);
 });
 
 // Admin
@@ -75,22 +72,18 @@ export const adminListPosts = asyncHandler<
   ValidatedRequest<never, AdminListPostsQuery>
 >(async (req, res: Response) => {
   const result = await blogService.adminListPosts(req.validatedQuery);
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });
 
 export const adminListCategories = asyncHandler(async (_req, res: Response) => {
   const cats = await blogCategoryService.adminList();
-  res.status(HTTP_STATUS.OK).json({ success: true, data: cats });
+  ApiResponse.ok(res, cats);
 });
 
 export const getPostById = asyncHandler<ValidatedRequest<PostIdParams>>(
   async (req, res: Response) => {
     const post = await blogService.getPostById(req.validatedParams.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, data: post });
+    ApiResponse.ok(res, post);
   }
 );
 
@@ -102,20 +95,20 @@ export const createPost = asyncHandler<
     ...req.body,
     authorId: req.user.id,
   });
-  res.status(HTTP_STATUS.CREATED).json({ success: true, data: post });
+  ApiResponse.created(res, post);
 });
 
 export const updatePost = asyncHandler<
   ValidatedRequest<UpdatePostParams, never, UpdatePostBody>
 >(async (req, res: Response) => {
   const post = await blogService.updatePost(req.validatedParams.id, req.body);
-  res.status(HTTP_STATUS.OK).json({ success: true, data: post });
+  ApiResponse.ok(res, post);
 });
 
 export const deletePost = asyncHandler<ValidatedRequest<PostIdParams>>(
   async (req, res: Response) => {
     await blogService.deletePost(req.validatedParams.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, message: "Post deleted" });
+    ApiResponse.message(res, "Post deleted");
   }
 );
 
@@ -126,10 +119,7 @@ export const uploadBlogImage = asyncHandler(async (req, res: Response) => {
     req.file.buffer,
     req.file.mimetype
   );
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    data: { imageUrl: result.url, publicId: result.publicId },
-  });
+  ApiResponse.created(res, { imageUrl: result.url, publicId: result.publicId });
 });
 
 // Admin category management
@@ -137,7 +127,7 @@ export const createCategory = asyncHandler<
   ValidatedRequest<never, never, CreateCategoryBody>
 >(async (req, res: Response) => {
   const cat = await blogCategoryService.create(req.body);
-  res.status(HTTP_STATUS.CREATED).json({ success: true, data: cat });
+  ApiResponse.created(res, cat);
 });
 
 export const updateCategory = asyncHandler<
@@ -147,7 +137,7 @@ export const updateCategory = asyncHandler<
     req.validatedParams.id,
     req.body
   );
-  res.status(HTTP_STATUS.OK).json({ success: true, data: cat });
+  ApiResponse.ok(res, cat);
 });
 
 export const deleteCategory = asyncHandler<ValidatedRequest<CategoryIdParams>>(
@@ -157,6 +147,6 @@ export const deleteCategory = asyncHandler<ValidatedRequest<CategoryIdParams>>(
       result.action === "deactivated"
         ? "Category is in use (including deleted posts) — deactivated instead of deleted"
         : "Category deleted";
-    res.status(HTTP_STATUS.OK).json({ success: true, message: message });
+    ApiResponse.message(res, message);
   }
 );

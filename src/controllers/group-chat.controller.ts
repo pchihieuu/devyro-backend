@@ -3,7 +3,11 @@ import multer from "multer";
 import { groupChatService } from "../services/group-chat.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { BadRequestError } from "../utils/errors";
-import { HTTP_STATUS } from "../constants/httpStatus";
+import { ApiResponse } from "../utils/api-response";
+import {
+  buildPaginatedResult,
+  buildPaginationMeta,
+} from "../utils/pagination.util";
 import { ValidatedRequest } from "../types/express";
 import {
   AddMembersBody,
@@ -12,6 +16,7 @@ import {
   DeleteGroupMessageParams,
   GetGroupMessagesParams,
   GetGroupMessagesQuery,
+  GetUserGroupsQuery,
   GroupIdParams,
   MemberActionParams,
   SendGroupMessageBody,
@@ -54,7 +59,7 @@ class GroupChatController {
       memberIds,
     });
 
-    res.status(HTTP_STATUS.CREATED).json({ success: true, data: group });
+    ApiResponse.created(res, group);
   });
 
   updateGroup = asyncHandler<
@@ -68,12 +73,17 @@ class GroupChatController {
       { name, description, avatar }
     );
 
-    res.status(HTTP_STATUS.OK).json({ success: true, data: group });
+    ApiResponse.ok(res, group);
   });
 
-  getUserGroups = asyncHandler(async (req, res: Response): Promise<void> => {
-    const groups = await groupChatService.getUserGroups(req.user!.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, data: groups });
+  getUserGroups = asyncHandler<
+    ValidatedRequest<Record<string, never>, GetUserGroupsQuery>
+  >(async (req, res: Response): Promise<void> => {
+    const groups = await groupChatService.getUserGroups(
+      req.user!.id,
+      req.validatedQuery.search
+    );
+    ApiResponse.ok(res, groups);
   });
 
   getGroupDetails = asyncHandler<ValidatedRequest<GroupIdParams>>(
@@ -82,7 +92,7 @@ class GroupChatController {
         req.user!.id,
         req.validatedParams.groupId
       );
-      res.status(HTTP_STATUS.OK).json({ success: true, data: group });
+      ApiResponse.ok(res, group);
     }
   );
 
@@ -91,7 +101,7 @@ class GroupChatController {
       const invitations = await groupChatService.getPendingInvitations(
         req.user!.id
       );
-      res.status(HTTP_STATUS.OK).json({ success: true, data: invitations });
+      ApiResponse.ok(res, invitations);
     }
   );
 
@@ -101,10 +111,10 @@ class GroupChatController {
         req.user!.id,
         req.validatedParams.groupId
       );
-      res.status(HTTP_STATUS.OK).json({
-        success: true,
-        message: "Invitation accepted. You have joined the group.",
-      });
+      ApiResponse.message(
+        res,
+        "Invitation accepted. You have joined the group."
+      );
     }
   );
 
@@ -114,31 +124,33 @@ class GroupChatController {
         req.user!.id,
         req.validatedParams.groupId
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "Invitation rejected." });
+      ApiResponse.message(res, "Invitation rejected.");
     }
   );
 
   getGroupMessages = asyncHandler<
     ValidatedRequest<GetGroupMessagesParams, GetGroupMessagesQuery>
   >(async (req, res: Response): Promise<void> => {
-    const { page, limit } = req.validatedQuery;
+    const { page, limit, search } = req.validatedQuery;
 
     const result = await groupChatService.getGroupMessages(
       req.user!.id,
       req.validatedParams.groupId,
       page,
-      limit
+      limit,
+      search
     );
 
-    // getGroupMessages returns {messages, total, hasMore} rather than the
-    // shared PaginatedResult<T> shape (buildPaginatedResult/buildPaginationMeta)
-    // that every other list endpoint uses — kept as-is here to avoid
-    // changing the wire format the frontend already consumes, but flagged
-    // in AUDIT_REPORT.md as a "Response format consistency" gap worth a
-    // deliberate follow-up migration.
-    res.status(HTTP_STATUS.OK).json({ success: true, data: result });
+    // Tương thích ngược: `data` vẫn là {messages, total, hasMore} như FE đang
+    // đọc. Đồng thời trả thêm `pagination` chuẩn (cùng shape mọi list
+    // endpoint khác) để FE có thể migrate dần mà KHÔNG cần đổi wire format
+    // trong 1 lần. Khi FE đã chuyển xong có thể bỏ `data.total/hasMore`.
+    ApiResponse.success(res, {
+      data: result,
+      pagination: buildPaginationMeta(
+        buildPaginatedResult(result.messages, result.total, page, limit)
+      ),
+    });
   });
 
   sendGroupMessage = asyncHandler<
@@ -174,7 +186,7 @@ class GroupChatController {
       }
     );
 
-    res.status(HTTP_STATUS.CREATED).json({ success: true, data: message });
+    ApiResponse.created(res, message);
   });
 
   deleteGroupMessage = asyncHandler<ValidatedRequest<DeleteGroupMessageParams>>(
@@ -184,9 +196,7 @@ class GroupChatController {
         req.validatedParams.groupId,
         req.validatedParams.messageId
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "Message deleted" });
+      ApiResponse.message(res, "Message deleted");
     }
   );
 
@@ -203,7 +213,7 @@ class GroupChatController {
         req.file.size
       );
 
-      res.status(HTTP_STATUS.CREATED).json({ success: true, data: media });
+      ApiResponse.created(res, media);
     }
   );
 
@@ -213,9 +223,7 @@ class GroupChatController {
         req.user!.id,
         req.validatedParams.groupId
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "Marked as read" });
+      ApiResponse.message(res, "Marked as read");
     }
   );
 
@@ -241,7 +249,7 @@ class GroupChatController {
         "Tất cả người dùng đã ở trong nhóm hoặc đã có lời mời chờ xử lý.";
     }
 
-    res.status(HTTP_STATUS.OK).json({ success: true, data: result, message });
+    ApiResponse.ok(res, result, message);
   });
 
   removeMember = asyncHandler<ValidatedRequest<MemberActionParams>>(
@@ -251,9 +259,7 @@ class GroupChatController {
         req.validatedParams.groupId,
         req.validatedParams.targetUserId
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "Member removed" });
+      ApiResponse.message(res, "Member removed");
     }
   );
 
@@ -264,9 +270,7 @@ class GroupChatController {
         req.validatedParams.groupId,
         req.validatedParams.targetUserId
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "Member promoted to admin" });
+      ApiResponse.message(res, "Member promoted to admin");
     }
   );
 
@@ -277,9 +281,7 @@ class GroupChatController {
         req.validatedParams.groupId,
         req.user!.id
       );
-      res
-        .status(HTTP_STATUS.OK)
-        .json({ success: true, message: "You have left the group" });
+      ApiResponse.message(res, "You have left the group");
     }
   );
 }

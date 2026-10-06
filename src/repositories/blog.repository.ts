@@ -3,6 +3,8 @@ import { BlogPost, BlogPostStatus } from "../entities/BlogPost.entity";
 import { BlogPostView } from "../entities/BlogPostView.entity";
 import { BlogTag } from "../entities/BlogTag.entity";
 import { getSkip } from "../utils/pagination.util";
+import { containsPattern } from "../utils/like.util";
+import { In } from "typeorm";
 
 const postRepository = AppDataSource.getRepository(BlogPost);
 const tagRepository = AppDataSource.getRepository(BlogTag);
@@ -31,7 +33,7 @@ function applyCommonFilters(
   if (filters.tag) qb.andWhere("tags.slug = :tag", { tag: filters.tag });
   if (filters.search) {
     qb.andWhere("(post.title ILIKE :s OR post.excerpt ILIKE :s)", {
-      s: `%${filters.search}%`,
+      s: containsPattern(filters.search),
     });
   }
 }
@@ -153,6 +155,30 @@ export class BlogRepository {
 
   async createTag(name: string, slug: string): Promise<BlogTag> {
     return tagRepository.save(tagRepository.create({ name, slug }));
+  }
+
+  /** Lấy nhiều tag theo slug bằng 1 query (thay cho N lần findTagBySlug). */
+  async findTagsBySlugs(slugs: string[]): Promise<BlogTag[]> {
+    if (slugs.length === 0) return [];
+    return tagRepository.find({ where: { slug: In(slugs) } });
+  }
+
+  /**
+   * Insert hàng loạt, bỏ qua dòng trùng (ON CONFLICT DO NOTHING). Dùng thay
+   * cho "find rồi create" để 2 request cùng tạo 1 tag mới không văng lỗi
+   * unique-violation.
+   */
+  async insertTagsIgnoreConflict(
+    tags: Array<{ name: string; slug: string }>
+  ): Promise<void> {
+    if (tags.length === 0) return;
+    await tagRepository
+      .createQueryBuilder()
+      .insert()
+      .into(BlogTag)
+      .values(tags)
+      .orIgnore()
+      .execute();
   }
 
   // --- View tracking ---

@@ -1,8 +1,7 @@
 import { Response } from "express";
 import { notificationService } from "../services/notification.service";
 import { asyncHandler } from "../utils/asyncHandler";
-import { HTTP_STATUS } from "../constants/httpStatus";
-import { buildPaginationMeta } from "../utils/pagination.util";
+import { ApiResponse } from "../utils/api-response";
 
 import {
   GetNotificationsQuery,
@@ -21,11 +20,8 @@ export const getMyNotifications = asyncHandler<
     limit
   );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
+  ApiResponse.paginated(res, result, {
     message: "Notifications retrieved successfully",
-    data: result.items,
-    pagination: buildPaginationMeta(result),
     meta: { unreadCount: result.unreadCount },
   });
 });
@@ -33,7 +29,7 @@ export const getMyNotifications = asyncHandler<
 export const getUnreadCount = asyncHandler(
   async (req, res: Response): Promise<void> => {
     const count = await notificationService.getUnreadCount(req.user!.id);
-    res.status(HTTP_STATUS.OK).json({ success: true, data: { count } });
+    ApiResponse.ok(res, { count });
   }
 );
 
@@ -41,17 +37,13 @@ export const markAsRead = asyncHandler<
   ValidatedRequest<NotificationIdParams, Record<string, never>, undefined>
 >(async (req, res: Response): Promise<void> => {
   await notificationService.markAsRead(req.validatedParams.id, req.user!.id);
-  res
-    .status(HTTP_STATUS.OK)
-    .json({ success: true, message: "Notification marked as read" });
+  ApiResponse.message(res, "Notification marked as read");
 });
 
 export const markAllAsRead = asyncHandler(
   async (req, res: Response): Promise<void> => {
     await notificationService.markAllAsRead(req.user!.id);
-    res
-      .status(HTTP_STATUS.OK)
-      .json({ success: true, message: "All notifications marked as read" });
+    ApiResponse.message(res, "All notifications marked as read");
   }
 );
 
@@ -62,7 +54,5 @@ export const deleteNotification = asyncHandler<
     req.validatedParams.id,
     req.user!.id
   );
-  res
-    .status(HTTP_STATUS.OK)
-    .json({ success: true, message: "Notification deleted successfully" });
+  ApiResponse.message(res, "Notification deleted successfully");
 });

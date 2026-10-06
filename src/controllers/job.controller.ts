@@ -4,7 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { ForbiddenError, NotFoundError } from "../utils/errors";
 import { UserRole } from "../entities/User.entity";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
-import { buildPaginationMeta } from "../utils/pagination.util";
+import { ApiResponse } from "../utils/api-response";
 import { ValidatedRequest } from "../types/express";
 import {
   JobIdParams,
@@ -25,17 +25,14 @@ export const createJob = asyncHandler(
     try {
       const job = await jobService.createJob(req.user!.id, req.body);
 
-      res.status(HTTP_STATUS.CREATED).json({
-        success: true,
-        message: HTTP_MESSAGE.CREATED,
-        data: job,
-      });
+      ApiResponse.created(res, job, HTTP_MESSAGE.CREATED);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        res.status(HTTP_STATUS.BAD_REQUEST).json({
-          success: false,
-          message: "Please create a company profile before posting jobs",
-        });
+        ApiResponse.error(
+          res,
+          HTTP_STATUS.BAD_REQUEST,
+          "Please create a company profile before posting jobs"
+        );
         return;
       }
       throw error;
@@ -76,11 +73,7 @@ export const getJobs = asyncHandler<
 
   const result = await jobService.getJobs(filters, pagination);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });
 
 export const getJobsEmployer = asyncHandler<
@@ -99,11 +92,7 @@ export const getJobsEmployer = asyncHandler<
     order,
   });
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: result.items,
-    pagination: buildPaginationMeta(result),
-  });
+  ApiResponse.paginated(res, result);
 });
 
 export const getJobById = asyncHandler<ValidatedRequest<GetJobByIdParams>>(
@@ -113,10 +102,7 @@ export const getJobById = asyncHandler<ValidatedRequest<GetJobByIdParams>>(
 
     const job = await jobService.getJobById(id, userId);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      data: job,
-    });
+    ApiResponse.ok(res, job);
   }
 );
 
@@ -126,11 +112,7 @@ export const updateJob = asyncHandler<
   const { id } = req.validatedParams;
   const job = await jobService.updateJob(id, req.user!.id, req.body);
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: HTTP_MESSAGE.UPDATED,
-    data: job,
-  });
+  ApiResponse.ok(res, job, HTTP_MESSAGE.UPDATED);
 });
 
 export const deleteJob = asyncHandler<ValidatedRequest<JobIdParams>>(
@@ -138,10 +120,7 @@ export const deleteJob = asyncHandler<ValidatedRequest<JobIdParams>>(
     const { id } = req.validatedParams;
     await jobService.deleteJob(id, req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: HTTP_MESSAGE.DELETED,
-    });
+    ApiResponse.message(res, HTTP_MESSAGE.DELETED);
   }
 );
 
@@ -150,10 +129,6 @@ export const toggleCloseJob = asyncHandler<ValidatedRequest<JobIdParams>>(
     const { id } = req.validatedParams;
     const result = await jobService.toggleJobStatus(id, req.user!.id);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: result.message,
-      data: { isClosed: result.isClosed },
-    });
+    ApiResponse.ok(res, { isClosed: result.isClosed }, result.message);
   }
 );

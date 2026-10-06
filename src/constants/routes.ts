@@ -89,6 +89,7 @@ export const ROUTES = {
   },
   BLOGS: {
     BASE: "/blogs",
+    LIST: "/",
     BY_SLUG: "/:slug",
     RELATED: "/related/:id",
     LATEST: "/latest",
@@ -105,6 +106,7 @@ export const ROUTES = {
   },
   GROUPS: {
     BASE: "/groups",
+    LIST: "/",
 
     PENDING_INVITATIONS: "/invitations/pending",
 

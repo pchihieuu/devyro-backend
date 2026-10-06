@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/database.config";
 import { Job } from "../entities/Job.entity";
 import { IsNull, SelectQueryBuilder } from "typeorm";
 import { PaginationOptions, getSkip } from "../utils/pagination.util";
+import { containsPattern } from "../utils/like.util";
 
 export interface JobFilters {
   keyword?: string;
@@ -136,12 +137,12 @@ export class JobRepository {
 
     if (filters.keyword) {
       qb.andWhere("job.title ILIKE :keyword", {
-        keyword: `%${filters.keyword}%`,
+        keyword: containsPattern(filters.keyword),
       });
     }
     if (filters.location) {
       qb.andWhere("job.location ILIKE :location", {
-        location: `%${filters.location}%`,
+        location: containsPattern(filters.location),
       });
     }
 
@@ -178,11 +179,14 @@ export class JobRepository {
 
   private applySkillFilter(qb: SelectQueryBuilder<Job>, skillList: string[]) {
     // && = "overlap": job.skills có ít nhất 1 phần tử trùng với skillList
-    // (giữ đúng semantics OR như logic ILIKE cũ, không phải match hết)
-    qb.andWhere(
-      `EXISTS (SELECT 1 FROM unnest(job.skills) AS s(skill) WHERE LOWER(skill) = ANY(:skills::text[]))`,
-      { skills: skillList.map((s) => s.toLocaleLowerCase()) }
-    );
+    // (giữ đúng semantics OR như logic ILIKE cũ, không phải match hết).
+    // Skills luôn được lowercase ở validator khi ghi (và migration
+    // LowercaseJobSkills chuẩn hoá dữ liệu cũ) nên so khớp trực tiếp được —
+    // khác với `EXISTS (unnest ... LOWER(skill))` trước đây, `&&` dùng được
+    // GIN index IDX_jobs_skills_gin thay vì quét từng dòng.
+    qb.andWhere(`job.skills && :skills::text[]`, {
+      skills: skillList.map((s) => s.toLocaleLowerCase()),
+    });
     return qb;
   }
 

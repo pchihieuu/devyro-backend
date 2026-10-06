@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { protect } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
+import { idempotency } from "../middlewares/idempotency.middleware";
 import {
   createCompanySchema,
   updateCompanySchema,
@@ -49,6 +50,7 @@ router.get(
 router.post(
   ROUTES.COMPANIES.LIST,
   protect,
+  idempotency(),
   validate(createCompanySchema),
   createCompany
 );

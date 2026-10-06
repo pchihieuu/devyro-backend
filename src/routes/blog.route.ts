@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { idempotency } from "../middlewares/idempotency.middleware";
 import { protect } from "../middlewares/auth.middleware";
 import { adminOnly } from "../middlewares/admin.middleware";
 import { validate } from "../middlewares/validation.middleware";
@@ -37,7 +38,7 @@ import { ROUTES } from "../constants/routes";
 const router = Router();
 
 // Public
-router.get("/", validate(listPostsSchema), listPosts);
+router.get(ROUTES.BLOGS.LIST, validate(listPostsSchema), listPosts);
 router.get(ROUTES.BLOGS.LATEST, validate(latestPostsSchema), getLatestPosts);
 router.get(ROUTES.BLOGS.CATEGORIES, listCategories);
 router.get(ROUTES.BLOGS.RELATED, validate(postIdParamSchema), getRelatedPosts);
@@ -77,6 +78,7 @@ router.post(
   ROUTES.BLOGS.ADMIN.POSTS,
   protect,
   adminOnly,
+  idempotency(),
   validate(createPostSchema),
   createPost
 );
