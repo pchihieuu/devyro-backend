@@ -1,6 +1,7 @@
 import amqplib, { Channel, ChannelModel } from "amqplib";
 import { config } from "./../config/env.config";
 import { logger } from "../utils/logger";
+import { Gauge, Counter } from "prom-client";
 
 export enum QueueName {
   GROUP_MESSAGE = "group.message",
@@ -66,8 +67,19 @@ class PublishMutex {
   }
 }
 
-class MessageQueueService {
+const envMs = (name: string, fallback: number): number => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+/** Callback chạy sau MỖI lần kết nối lại thành công (vd đăng ký lại consumer). */
+export type ReconnectedHandler = () => Promise<void>;
+
+export class MessageQueueService {
   private connection: ChannelModel | null = null;
+  private closing = false;
+  private reconnecting = false;
+  private reconnectedHandlers: ReconnectedHandler[] = [];
   private publishChannel: Channel | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
@@ -96,15 +108,8 @@ class MessageQueueService {
       this.isConnecting = false;
       console.log("Connected to RabbitMQ");
 
-      this.connection.on("error", (err) => {
-        console.error("RabbitMQ connection error:", err);
-        this.reconnect();
-      });
-
-      this.connection.on("close", () => {
-        console.warn("RabbitMQ connection closed. Reconnecting...");
-        this.reconnect();
-      });
+      this.attachListeners(this.connection);
+      this.watchPublishChannel(this.publishChannel);
     } catch (error) {
       this.isConnecting = false;
       console.error("Failed to connect to RabbitMQ:", error);
@@ -143,18 +148,59 @@ class MessageQueueService {
 
   private registerRuntimeReconnect(): void {
     if (!this.connection) return;
-
     this.connection.removeAllListeners("error");
     this.connection.removeAllListeners("close");
+    this.attachListeners(this.connection);
+  }
 
-    this.connection.on("error", (err) => {
+  /**
+   * Gắn listener cho 1 connection cụ thể. Sự kiện từ một connection CŨ (đã bị
+   * thay thế) bị bỏ qua — nếu không, 'error' + 'close' của kết nối cũ đến muộn
+   * sẽ huỷ kết nối mới và kích hoạt reconnect thừa (đăng ký trùng consumer).
+   */
+  private attachListeners(conn: ChannelModel): void {
+    conn.on("error", (err) => {
       console.error("RabbitMQ connection error:", err);
-      this.reconnect();
+      if (this.connection === conn) this.reconnect();
     });
-    this.connection.on("close", () => {
+    conn.on("close", () => {
+      if (this.connection !== conn) return; // kết nối cũ / đã xử lý
       console.warn("RabbitMQ connection closed. Reconnecting...");
       this.reconnect();
     });
+  }
+
+  /**
+   * amqplib ném lỗi KHÔNG bắt được nếu channel phát 'error' mà không có
+   * listener (có thể làm sập process). Channel publish chết riêng lẻ (kết nối
+   * vẫn sống) được tạo lại tại chỗ thay vì để publish() thất bại mãi.
+   */
+  private watchPublishChannel(ch: Channel): void {
+    ch.on("error", (err) => {
+      console.error("[MQ] publish channel error:", err);
+    });
+    ch.on("close", () => {
+      if (this.publishChannel !== ch || this.closing) return;
+      this.publishChannel = null;
+      const conn = this.connection;
+      if (!conn) return; // mất cả kết nối: reconnect() lo
+      conn
+        .createChannel()
+        .then((fresh) => {
+          if (this.connection !== conn) return void fresh.close().catch(() => undefined);
+          this.publishChannel = fresh;
+          this.watchPublishChannel(fresh);
+          console.warn("[MQ] publish channel recreated");
+        })
+        .catch(() => {
+          if (this.connection === conn) this.reconnect();
+        });
+    });
+  }
+
+  /** Đăng ký việc cần làm lại sau mỗi lần kết nối lại (consumer của workers…). */
+  onReconnected(handler: ReconnectedHandler): void {
+    this.reconnectedHandlers.push(handler);
   }
 
   async createConsumerChannel(prefetch = 10): Promise<Channel> {
@@ -226,18 +272,63 @@ class MessageQueueService {
     ]);
   }
 
+  /**
+   * Kết nối lại NHIỀU LẦN với backoff luỹ thừa (mặc định 5s → 30s) cho tới khi
+   * thành công.
+   *
+   * BUG FIX: bản cũ chỉ thử đúng 1 lần sau 5s. `connect()` nuốt lỗi (không
+   * throw) nên nếu RabbitMQ vẫn đang tắt ở lần thử đó thì KHÔNG còn lần thử
+   * nào nữa — app không bao giờ tự nối lại dù RabbitMQ đã bật. Hệ quả với
+   * outbox: event nằm mãi ở "channel not ready".
+   */
   private reconnect(): void {
     this.connection = null;
     this.publishChannel = null;
     this.topologyReady = false;
+    if (this.closing || this.reconnecting) return;
+    this.reconnecting = true;
+    this.scheduleReconnect(envMs("MQ_RECONNECT_BASE_MS", 5000), 1);
+  }
 
+  private scheduleReconnect(delayMs: number, attempt: number): void {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
-    this.reconnectTimeout = setTimeout(() => {
-      console.log("Attempting to reconnect to RabbitMQ...");
-      this.connect().then(() => {
-        if (this.isConnected()) this.registerRuntimeReconnect();
-      });
-    }, 5000);
+    this.reconnectTimeout = setTimeout(async () => {
+      if (this.closing) {
+        this.reconnecting = false;
+        return;
+      }
+      console.log(`Attempting to reconnect to RabbitMQ (attempt ${attempt})...`);
+      this.isConnecting = false;
+      await this.connect();
+
+      if (!this.isConnected()) {
+        mqReconnectAttempts.inc({ result: "failed" });
+        const max = envMs("MQ_RECONNECT_MAX_MS", 30_000);
+        this.scheduleReconnect(Math.min(delayMs * 2, max), attempt + 1);
+        return;
+      }
+
+      mqReconnectAttempts.inc({ result: "success" });
+      this.reconnecting = false;
+      this.registerRuntimeReconnect();
+      await this.runReconnectedHandlers();
+    }, delayMs);
+  }
+
+  private async runReconnectedHandlers(): Promise<void> {
+    const conn = this.connection;
+    for (const handler of this.reconnectedHandlers) {
+      try {
+        await handler();
+      } catch (error) {
+        logger.error("[MQ] reconnect handler failed, forcing another reconnect", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Đóng kết nối để 'close' kích hoạt reconnect() → chạy lại các handler.
+        if (conn && this.connection === conn) await conn.close().catch(() => undefined);
+        return;
+      }
+    }
   }
 
   /**
@@ -358,6 +449,7 @@ class MessageQueueService {
 
   async close(): Promise<void> {
     try {
+      this.closing = true; // chặn reconnect do chính việc đóng kết nối gây ra
       if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
       await this.publishChannel?.close();
       await this.connection?.close();
@@ -373,3 +465,18 @@ class MessageQueueService {
 }
 
 export const mqService = new MessageQueueService();
+
+const mqReconnectAttempts = new Counter({
+  name: "jobportal_mq_reconnect_attempts_total",
+  help: "Số lần thử kết nối lại RabbitMQ theo kết quả",
+  labelNames: ["result"] as const,
+});
+
+// 1 = đang kết nối (có publish channel), 0 = mất kết nối. Nên cảnh báo khi == 0 kéo dài.
+new Gauge({
+  name: "jobportal_mq_connected",
+  help: "RabbitMQ đang kết nối (1) hay không (0)",
+  collect() {
+    this.set(mqService.isConnected() ? 1 : 0);
+  },
+});
