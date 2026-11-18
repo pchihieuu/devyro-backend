@@ -37,3 +37,8 @@ yarn-error.log*
 coverage/
 .nyc_output/
 *.dump
+# Observability secrets (token Telegram, METRICS_TOKEN cho Prometheus)
+alertmanager/secrets/*
+!alertmanager/secrets/.gitkeep
+prometheus/secrets/*
+!prometheus/secrets/.gitkeep
