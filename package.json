@@ -21,6 +21,8 @@
     "migration:show": "npm run typeorm -- migration:show -d src/config/database.config.ts",
     "migration:run:prod": "cross-env NODE_ENV=production DB_STATEMENT_TIMEOUT_MS=300000 typeorm migration:run -d dist/config/database.config.js",
     "start:render": "npm run migration:run:prod && npm start",
+    "verify": "cross-env NODE_ENV=test ts-node --transpile-only scripts/verify/index.ts",
+    "verify:types": "tsc -p tsconfig.verify.json --noEmit",
     "openapi:generate": "cross-env TS_NODE_TRANSPILE_ONLY=true ts-node scripts/openapi-generate.ts",
     "openapi:check": "cross-env TS_NODE_TRANSPILE_ONLY=true ts-node scripts/openapi-generate.ts --check"
   },
