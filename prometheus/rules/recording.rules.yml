@@ -1,0 +1,88 @@
+# Recording rules: tính trước các biểu thức nặng để dashboard + alert dùng chung.
+# Quy ước tên: level:metric:operations (https://prometheus.io/docs/practices/rules/)
+groups:
+  - name: jobportal_http
+    interval: 30s
+    rules:
+      - record: job:http_requests:rate5m
+        expr: sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[5m]))
+
+      - record: job:http_requests_5xx:rate5m
+        expr: sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[5m]))
+
+      - record: job:http_latency_seconds:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job="jobportal-api"}[5m])))
+      - record: job:http_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="jobportal-api"}[5m])))
+      - record: job:http_latency_seconds:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="jobportal-api"}[5m])))
+
+      # Theo route (path = route pattern, đã chuẩn hoá nên cardinality thấp).
+      - record: path:http_requests:rate5m
+        expr: sum by (path, method) (rate(http_request_duration_seconds_count{job="jobportal-api"}[5m]))
+      - record: path:http_requests_5xx:ratio_rate5m
+        expr: |
+          sum by (path, method) (rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[5m]))
+          /
+          sum by (path, method) (rate(http_request_duration_seconds_count{job="jobportal-api"}[5m]))
+      - record: path:http_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, path, method) (rate(http_request_duration_seconds_bucket{job="jobportal-api"}[5m])))
+      - record: path:http_latency_seconds:p99_5m
+        expr: histogram_quantile(0.99, sum by (le, path, method) (rate(http_request_duration_seconds_bucket{job="jobportal-api"}[5m])))
+
+  # SLO: tỉ lệ lỗi 5xx theo nhiều cửa sổ (đầu vào của burn-rate alert)
+  - name: jobportal_slo
+    interval: 30s
+    rules:
+      - record: job:slo_errors:ratio_rate5m
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[5m]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[5m]))
+      - record: job:slo_errors:ratio_rate30m
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[30m]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[30m]))
+      - record: job:slo_errors:ratio_rate1h
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[1h]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[1h]))
+      - record: job:slo_errors:ratio_rate6h
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[6h]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[6h]))
+      - record: job:slo_errors:ratio_rate1d
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code=~"5.."}[1d]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[1d]))
+
+      # Latency SLI: tỉ lệ request hoàn thành trong 500ms (le="0.5" có trong buckets).
+      - record: job:slo_latency_good:ratio_rate5m
+        expr: |
+          sum(rate(http_request_duration_seconds_bucket{job="jobportal-api",le="0.5"}[5m]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[5m]))
+      - record: job:slo_latency_good:ratio_rate1h
+        expr: |
+          sum(rate(http_request_duration_seconds_bucket{job="jobportal-api",le="0.5"}[1h]))
+          / sum(rate(http_request_duration_seconds_count{job="jobportal-api"}[1h]))
+
+  - name: jobportal_data
+    interval: 30s
+    rules:
+      - record: operation:db_query_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, operation) (rate(jobportal_db_query_duration_seconds_bucket[5m])))
+      - record: job:db_query_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(jobportal_db_query_duration_seconds_bucket[5m])))
+      - record: job:db_query_seconds:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(jobportal_db_query_duration_seconds_bucket[5m])))
+      - record: command:redis_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, command) (rate(jobportal_redis_command_duration_seconds_bucket[5m])))
+      - record: prefix:redis_cache_hit:ratio_rate15m
+        expr: |
+          sum by (prefix) (rate(jobportal_redis_cache_operations_total{result="hit"}[15m]))
+          / sum by (prefix) (rate(jobportal_redis_cache_operations_total[15m]))
+      - record: service:external_call_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, service) (rate(jobportal_external_call_duration_seconds_bucket[5m])))
+      - record: service:external_call_errors:ratio_rate5m
+        expr: |
+          sum by (service) (rate(jobportal_external_call_duration_seconds_count{result=~"error|timeout"}[5m]))
+          / sum by (service) (rate(jobportal_external_call_duration_seconds_count[5m]))
