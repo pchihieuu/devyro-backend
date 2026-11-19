@@ -18,7 +18,11 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
       - name: OpenAPI contract
-        run: npm run openapi:check
+        run: |
+          npm run openapi:generate
+          git --no-pager diff --stat -- docs/openapi/openapi.json
+          git --no-pager diff -- docs/openapi/openapi.json | head -80
+          git diff --quiet -- docs/openapi/openapi.json || { echo "::error::openapi.json differs from generated output"; exit 1; }
 
   alerts:
     runs-on: ubuntu-latest
