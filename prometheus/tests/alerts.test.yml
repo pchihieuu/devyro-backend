@@ -26,7 +26,7 @@ tests:
                 instance: "api:5000",
               }
             exp_annotations:
-              summary: "API scrape failed (api:5000)"
+              summary: "API cannot be scraped (api:5000)"
               description: "API cannot be scraped (api:5000)"
               runbook_url: "docs/observability.md#apidown"
 
@@ -43,7 +43,7 @@ tests:
         exp_alerts:
           - exp_labels: { severity: critical, area: slo }
             exp_annotations:
-              summary: "Fast error budget burn (>14.4x)"
+              summary: "Rapid budget burn due to errors (>14.4x)"
               description: "5xx rate (1h) = 10%. The monthly error budget is being depleted very quickly."
               runbook_url: "docs/observability.md#sloerrorbudgetfastburn"
 
@@ -71,8 +71,8 @@ tests:
           - exp_labels:
               { severity: critical, area: queue, queue: group.message }
             exp_annotations:
-              summary: "Message in queue group.message has been sent to the DLQ"
-              description: "Poison message detected - check the '[MQ] ... exceeded 5 attempts' logs and Sentry. Fix the underlying issue, then manually replay the message."
+              summary: "Messages in queue group.message have been sent to the DLQ"
+              description: "Poison message detected — check the '[MQ] ... exceeded 5 attempts' logs and Sentry. Fix the underlying issue, then manually replay the messages."
               runbook_url: "docs/observability.md#mqmessagedeadlettered"
 
   - name: Outbox stuck when pending but nothing published
@@ -89,7 +89,7 @@ tests:
           - exp_labels: { severity: critical, area: outbox, job: jobportal-api }
             exp_annotations:
               summary: "Outbox has pending events, but no events have been published in the last 10 minutes"
-              description: "The outboxRelay may have stopped or MQ may be unavailable. Group messages are NOT being delivered in real time"
+              description: "The outboxRelay may have stopped or MQ may be unavailable. Group messages are NOT being delivered in real time."
               runbook_url: "docs/observability.md#outboxstuck"
 
   - name: Outbox draining normally does not alert

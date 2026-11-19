@@ -3,7 +3,7 @@
   "info": {
     "title": "Devyro API",
     "version": "1.0.0",
-    "description": "API contract between backend and frontend"
+    "description": "API contract between backend and frontend. **Automatically generated** from Express router + Zod validator — no manual JSON editing.\n\n### Envelope\n- Success: `{ success: true, message?, data?, pagination?, meta? }`\n- Failure: `{ success: false, message, errors: [{ field, message }], code?, requestId? }`\n\n### FE Guidelines\n- Column `decimal` (salary, rating...) returns as a **string** (`\"1500.00\"`).\n- All responses include header `X-Request-Id` — sent along with error reports.\n- POST requests to create resources support the header `Idempotency-Key` (optional).\n- Realtime (Socket.IO) is not included in the OpenAPI specification."
   },
   "servers": [
     {
@@ -51,10 +51,12 @@
   "paths": {
     "/analytics/overview": {
       "get": {
-        "tags": ["analytics"],
+        "tags": [
+          "analytics"
+        ],
         "operationId": "getAnalyticsOverview",
         "summary": "Employer Overview",
-        "description": "`counts` appears twice: in `data.counts` and in the top-level `counts` (maintaining compatibility with the old FE - so read `data.counts`).\n\n**Role:** employer",
+        "description": "`counts` Appears twice: in `data.counts` and at the top-level `counts` (retained for backward compatibility with the legacy frontend — `data.counts` should be used).\n\n**Role:** employer",
         "responses": {
           "200": {
             "description": "Success",
@@ -73,7 +75,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -122,13 +126,17 @@
                       ]
                     }
                   },
-                  "required": ["success", "data", "counts"]
+                  "required": [
+                    "success",
+                    "data",
+                    "counts"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -167,7 +175,9 @@
     },
     "/applications/{id}": {
       "get": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "getApplicationsById",
         "summary": "Application details",
         "parameters": [
@@ -199,7 +209,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -208,7 +220,10 @@
                       "$ref": "#/components/schemas/Application"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -224,7 +239,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -263,9 +278,11 @@
     },
     "/applications/{id}/analyze": {
       "post": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "postApplicationsByIdAnalyze",
-        "summary": "Running AI matching causes lag.",
+        "summary": "Run AI matching for orders",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -296,7 +313,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -305,7 +324,10 @@
                       "$ref": "#/components/schemas/AIMatchingAnalysis"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -321,7 +343,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -390,7 +412,9 @@
     },
     "/applications/{id}/status": {
       "put": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "putApplicationsByIdStatus",
         "summary": "Change order status",
         "description": "**Role:** employer",
@@ -424,7 +448,9 @@
                     ]
                   }
                 },
-                "required": ["status"]
+                "required": [
+                  "status"
+                ]
               }
             }
           }
@@ -447,7 +473,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -459,10 +487,15 @@
                           "$ref": "#/components/schemas/ApplicationStatus"
                         }
                       },
-                      "required": ["status"]
+                      "required": [
+                        "status"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -478,7 +511,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -488,7 +521,7 @@
             }
           },
           "403": {
-            "description": "Role only: employeer",
+            "description": "Role only: employer",
             "content": {
               "application/json": {
                 "schema": {
@@ -527,7 +560,9 @@
     },
     "/applications/{id}/withdraw": {
       "delete": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "deleteApplicationsByIdWithdraw",
         "summary": "Withdraw application",
         "description": "**Role:** jobseeker",
@@ -560,13 +595,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -582,7 +621,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -592,7 +631,7 @@
             }
           },
           "403": {
-            "description": "Chỉ vai trò: jobseeker",
+            "description": "Role only: jobseeker",
             "content": {
               "application/json": {
                 "schema": {
@@ -631,10 +670,12 @@
     },
     "/applications/apply/{jobId}": {
       "post": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "postApplicationsApplyByJobId",
-        "summary": "Ứng tuyển",
-        "description": "AI matching chạy nền sau khi tạo đơn (kết quả xuất hiện ở `aiMatching*` sau vài giây).\n\n**Vai trò:** jobseeker",
+        "summary": "Apply",
+        "description": "AI matching runs in the background after an order is created (results appear under `aiMatching*` after a few seconds).\n\n**Role:** jobseeker",
         "parameters": [
           {
             "name": "jobId",
@@ -671,7 +712,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -682,7 +725,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -691,7 +736,10 @@
                       "$ref": "#/components/schemas/Application"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -707,7 +755,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -717,7 +765,7 @@
             }
           },
           "403": {
-            "description": "Chỉ vai trò: jobseeker",
+            "description": "Role only: jobseeker",
             "content": {
               "application/json": {
                 "schema": {
@@ -737,7 +785,7 @@
             }
           },
           "409": {
-            "description": "Đã ứng tuyển tin này",
+            "description": "Already applied for this job posting",
             "content": {
               "application/json": {
                 "schema": {
@@ -747,7 +795,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -776,7 +824,9 @@
     },
     "/applications/job/{jobId}": {
       "get": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "getApplicationsJobByJobId",
         "summary": "An applicant for a job posting",
         "description": "**Role:** employer",
@@ -809,7 +859,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -827,10 +879,16 @@
                           "type": "integer"
                         }
                       },
-                      "required": ["total"]
+                      "required": [
+                        "total"
+                      ]
                     }
                   },
-                  "required": ["success", "data", "meta"]
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ]
                 }
               }
             }
@@ -846,7 +904,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -895,10 +953,12 @@
     },
     "/applications/my": {
       "get": {
-        "tags": ["applications"],
+        "tags": [
+          "applications"
+        ],
         "operationId": "getApplicationsMy",
-        "summary": "Đơn ứng tuyển của tôi",
-        "description": "**Vai trò:** jobseeker",
+        "summary": "My job application",
+        "description": "**Role:** jobseeker",
         "parameters": [
           {
             "name": "page",
@@ -928,7 +988,9 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt"]
+              "enum": [
+                "createdAt"
+              ]
             }
           },
           {
@@ -937,7 +999,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           },
           {
@@ -975,7 +1042,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -990,7 +1059,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -1006,7 +1079,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1016,7 +1089,7 @@
             }
           },
           "403": {
-            "description": "Chỉ vai trò: jobseeker",
+            "description": "Role only: jobseeker",
             "content": {
               "application/json": {
                 "schema": {
@@ -1045,10 +1118,12 @@
     },
     "/auth/forgot-password": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthForgotPassword",
-        "summary": "Yêu cầu email đặt lại mật khẩu",
-        "description": "Luôn trả 200 dù email có tồn tại hay không (chống dò email).\n\n**Rate limit:** authLimiter",
+        "summary": "Request password reset email",
+        "description": "Always return 200 whether the email exists or not (to prevent email enumeration).\n\n**Rate limit:** authLimiter",
         "requestBody": {
           "required": true,
           "content": {
@@ -1061,7 +1136,9 @@
                     "format": "email"
                   }
                 },
-                "required": ["email"]
+                "required": [
+                  "email"
+                ]
               }
             }
           }
@@ -1084,13 +1161,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -1131,10 +1212,12 @@
     },
     "/auth/login": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthLogin",
-        "summary": "Đăng nhập",
-        "description": "Trả `accessToken` trong body; `refreshToken` nằm trong cookie httpOnly.\n\n**Rate limit:** authLimiter",
+        "summary": "Login",
+        "description": "Return `accessToken` in the body; `refreshToken` is in the httpOnly cookie.\n\n**Rate limit:** authLimiter",
         "requestBody": {
           "required": true,
           "content": {
@@ -1151,7 +1234,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["email", "password"]
+                "required": [
+                  "email",
+                  "password"
+                ]
               }
             }
           }
@@ -1167,7 +1253,7 @@
                 }
               },
               "Set-Cookie": {
-                "description": "refreshToken (httpOnly, 7 ngày)",
+                "description": "refreshToken (httpOnly, 7 days)",
                 "schema": {
                   "type": "string"
                 }
@@ -1180,7 +1266,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1189,7 +1277,10 @@
                       "$ref": "#/components/schemas/AuthSession"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -1205,7 +1296,7 @@
             }
           },
           "401": {
-            "description": "Sai email hoặc mật khẩu",
+            "description": "Invalid email or password",
             "content": {
               "application/json": {
                 "schema": {
@@ -1240,9 +1331,11 @@
     },
     "/auth/logout": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthLogout",
-        "summary": "Đăng xuất thiết bị hiện tại",
+        "summary": "Logout current device",
         "responses": {
           "200": {
             "description": "Success",
@@ -1261,19 +1354,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1302,9 +1399,11 @@
     },
     "/auth/logout-all": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthLogoutAll",
-        "summary": "Đăng xuất mọi thiết bị",
+        "summary": "Logout all devices",
         "responses": {
           "200": {
             "description": "Success",
@@ -1323,19 +1422,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1364,9 +1467,11 @@
     },
     "/auth/me": {
       "get": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "getAuthMe",
-        "summary": "Hồ sơ của tôi",
+        "summary": "My Profile",
         "responses": {
           "200": {
             "description": "Success",
@@ -1385,7 +1490,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1394,13 +1501,16 @@
                       "$ref": "#/components/schemas/MyProfile"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1429,10 +1539,12 @@
     },
     "/auth/refresh-token": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthRefreshToken",
-        "summary": "Cấp access token mới",
-        "description": "Đọc cookie `refreshToken` (không cần body). Xoay vòng refresh token.\n\n**Rate limit:** refreshTokenLimiter",
+        "summary": "Generate new access token",
+        "description": "Read the `refreshToken` cookie (no need for a body). Rotate the refresh token.\n\n**Rate limit:** refreshTokenLimiter",
         "responses": {
           "200": {
             "description": "Success",
@@ -1444,7 +1556,7 @@
                 }
               },
               "Set-Cookie": {
-                "description": "refreshToken (httpOnly, 7 ngày)",
+                "description": "refreshToken (httpOnly, 7 days)",
                 "schema": {
                   "type": "string"
                 }
@@ -1457,7 +1569,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1469,16 +1583,21 @@
                           "type": "string"
                         }
                       },
-                      "required": ["accessToken"]
+                      "required": [
+                        "accessToken"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1517,10 +1636,12 @@
     },
     "/auth/register": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthRegister",
-        "summary": "Đăng ký tài khoản",
-        "description": "Tạo user, gửi email chào mừng và set cookie `refreshToken`.\n\n**Rate limit:** authLimiter",
+        "summary": "Register an account",
+        "description": "Create a user, send a welcome email, and set the `refreshToken` cookie.\n\n**Rate limit:** authLimiter",
         "requestBody": {
           "required": true,
           "content": {
@@ -1549,16 +1670,27 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
                   "role": {
                     "type": "string",
-                    "enum": ["jobseeker", "employer", "admin"]
+                    "enum": [
+                      "jobseeker",
+                      "employer",
+                      "admin"
+                    ]
                   }
                 },
-                "required": ["name", "email", "password", "role"]
+                "required": [
+                  "name",
+                  "email",
+                  "password",
+                  "role"
+                ]
               }
             }
           }
@@ -1574,7 +1706,7 @@
                 }
               },
               "Set-Cookie": {
-                "description": "refreshToken (httpOnly, 7 ngày)",
+                "description": "refreshToken (httpOnly, 7 days)",
                 "schema": {
                   "type": "string"
                 }
@@ -1587,7 +1719,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1596,7 +1730,10 @@
                       "$ref": "#/components/schemas/AuthSession"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -1612,7 +1749,7 @@
             }
           },
           "409": {
-            "description": "Email đã tồn tại",
+            "description": "Email already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -1647,9 +1784,11 @@
     },
     "/auth/reset-password": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthResetPassword",
-        "summary": "Đặt lại mật khẩu bằng token",
+        "summary": "Reset password using token",
         "description": "**Rate limit:** authLimiter",
         "requestBody": {
           "required": true,
@@ -1668,7 +1807,10 @@
                     "pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
                   }
                 },
-                "required": ["token", "newPassword"]
+                "required": [
+                  "token",
+                  "newPassword"
+                ]
               }
             }
           }
@@ -1691,13 +1833,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -1738,9 +1884,11 @@
     },
     "/auth/sessions": {
       "get": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "getAuthSessions",
-        "summary": "Danh sách phiên đăng nhập đang hoạt động",
+        "summary": "List of active login sessions",
         "responses": {
           "200": {
             "description": "Success",
@@ -1759,7 +1907,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1771,13 +1921,16 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1806,9 +1959,11 @@
     },
     "/auth/sessions/{tokenId}": {
       "delete": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "deleteAuthSessionsByTokenId",
-        "summary": "Thu hồi một phiên đăng nhập",
+        "summary": "Revoke a login session",
         "parameters": [
           {
             "name": "tokenId",
@@ -1837,13 +1992,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -1859,7 +2018,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -1898,22 +2057,26 @@
     },
     "/auth/upload-image": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthUploadImage",
         "summary": "Upload avatar",
-        "description": "Automatically update the user's `avatar` after the upload is complete (asynchronous).\n\n**Rate limit:** uploadLimiter",
+        "description": "Automatically update the user's `avatar` after the upload (asynchronously).\n\n**Rate limit:** uploadLimiter",
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["image"],
+                "required": [
+                  "image"
+                ],
                 "properties": {
                   "image": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Maximum 5MB - jpeg/png/pdf"
+                    "description": "Maximum 5MB — jpeg/png/pdf"
                   }
                 }
               }
@@ -1938,7 +2101,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -1954,10 +2119,16 @@
                           "type": "string"
                         }
                       },
-                      "required": ["imageUrl", "publicId"]
+                      "required": [
+                        "imageUrl",
+                        "publicId"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -1973,7 +2144,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2012,9 +2183,11 @@
     },
     "/auth/upload-image-public": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthUploadImagePublic",
-        "summary": "Upload photo (public, used during registration)",
+        "summary": "Upload image (public, use during registration)",
         "description": "**Rate limit:** publicUploadLimiter",
         "requestBody": {
           "required": true,
@@ -2022,12 +2195,14 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["image"],
+                "required": [
+                  "image"
+                ],
                 "properties": {
                   "image": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Maximum 5MB - jpeg/png/pdf"
+                    "description": "Maximum 5MB — jpeg/png/pdf"
                   }
                 }
               }
@@ -2052,7 +2227,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2068,10 +2245,16 @@
                           "type": "string"
                         }
                       },
-                      "required": ["imageUrl", "publicId"]
+                      "required": [
+                        "imageUrl",
+                        "publicId"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -2112,17 +2295,21 @@
     },
     "/auth/upload-resume": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "postAuthUploadResume",
         "summary": "Upload CV (PDF)",
-        "description": "Automatically update the user's `resume` after the upload is complete (asynchronously).\n\n**Rate limit:** uploadLimiter",
+        "description": "Upload complete and automatically update the user's `resume` (asynchronously).\n\n**Rate limit:** uploadLimiter",
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["resume"],
+                "required": [
+                  "resume"
+                ],
                 "properties": {
                   "resume": {
                     "type": "string",
@@ -2152,7 +2339,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2168,10 +2357,16 @@
                           "type": "string"
                         }
                       },
-                      "required": ["resumeUrl", "publicId"]
+                      "required": [
+                        "resumeUrl",
+                        "publicId"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -2187,7 +2382,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2226,9 +2421,11 @@
     },
     "/auth/verify-reset-token/{token}": {
       "get": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "operationId": "getAuthVerifyResetTokenByToken",
-        "summary": "Check if the password reset token is still valid",
+        "summary": "Verify that the password reset token is still valid",
         "parameters": [
           {
             "name": "token",
@@ -2258,13 +2455,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -2305,7 +2506,9 @@
     },
     "/blogs": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogs",
         "summary": "Published article",
         "parameters": [
@@ -2337,7 +2540,11 @@
             "schema": {
               "default": "publishedAt",
               "type": "string",
-              "enum": ["publishedAt", "viewCount", "createdAt"]
+              "enum": [
+                "publishedAt",
+                "viewCount",
+                "createdAt"
+              ]
             }
           },
           {
@@ -2346,7 +2553,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           },
           {
@@ -2392,7 +2604,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2407,7 +2621,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -2438,7 +2656,9 @@
     },
     "/blogs/{slug}": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsBySlug",
         "summary": "Article details",
         "description": "Increase `viewCount` (dedupe by user/user-agent).",
@@ -2471,7 +2691,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2480,7 +2702,10 @@
                       "$ref": "#/components/schemas/BlogPost"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -2521,7 +2746,9 @@
     },
     "/blogs/admin/categories": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsAdminCategories",
         "summary": "[Admin] All categories",
         "responses": {
@@ -2542,7 +2769,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2554,13 +2783,16 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2597,9 +2829,11 @@
         ]
       },
       "post": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "postBlogsAdminCategories",
-        "summary": "[Admin] Tạo danh mục",
+        "summary": "[Admin] Create category",
         "requestBody": {
           "required": true,
           "content": {
@@ -2617,14 +2851,20 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["portal_news", "industry_news"]
+                    "enum": [
+                      "portal_news",
+                      "industry_news"
+                    ]
                   },
                   "isActive": {
                     "default": true,
                     "type": "boolean"
                   }
                 },
-                "required": ["name", "type"]
+                "required": [
+                  "name",
+                  "type"
+                ]
               }
             }
           }
@@ -2647,7 +2887,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2656,7 +2898,10 @@
                       "$ref": "#/components/schemas/BlogCategory"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -2672,7 +2917,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2711,7 +2956,9 @@
     },
     "/blogs/admin/categories/{id}": {
       "put": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "putBlogsAdminCategoriesById",
         "summary": "[Admin] Edit category",
         "parameters": [
@@ -2743,7 +2990,10 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["portal_news", "industry_news"]
+                    "enum": [
+                      "portal_news",
+                      "industry_news"
+                    ]
                   },
                   "isActive": {
                     "type": "boolean"
@@ -2771,7 +3021,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -2780,7 +3032,10 @@
                       "$ref": "#/components/schemas/BlogCategory"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -2796,7 +3051,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2843,7 +3098,9 @@
         ]
       },
       "delete": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "deleteBlogsAdminCategoriesById",
         "summary": "[Admin] Delete category",
         "description": "If the category is still in use, it is merely disabled (`isActive=false`); the `message` field indicates the specific reason.",
@@ -2876,13 +3133,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -2898,7 +3159,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -2947,9 +3208,11 @@
     },
     "/blogs/admin/posts": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsAdminPosts",
-        "summary": "[Admin] List of all articles",
+        "summary": "[Admin] List of all posts",
         "parameters": [
           {
             "name": "page",
@@ -2979,7 +3242,11 @@
             "schema": {
               "default": "publishedAt",
               "type": "string",
-              "enum": ["publishedAt", "viewCount", "createdAt"]
+              "enum": [
+                "publishedAt",
+                "viewCount",
+                "createdAt"
+              ]
             }
           },
           {
@@ -2988,7 +3255,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           },
           {
@@ -3005,7 +3277,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["draft", "published", "archived"]
+              "enum": [
+                "draft",
+                "published",
+                "archived"
+              ]
             }
           }
         ],
@@ -3027,7 +3303,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3042,7 +3320,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -3058,7 +3340,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3095,7 +3377,9 @@
         ]
       },
       "post": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "postBlogsAdminPosts",
         "summary": "[Admin] Create a post",
         "parameters": [
@@ -3151,10 +3435,18 @@
                   "status": {
                     "default": "draft",
                     "type": "string",
-                    "enum": ["draft", "published", "archived"]
+                    "enum": [
+                      "draft",
+                      "published",
+                      "archived"
+                    ]
                   }
                 },
-                "required": ["title", "content", "categoryId"]
+                "required": [
+                  "title",
+                  "content",
+                  "categoryId"
+                ]
               }
             }
           }
@@ -3173,7 +3465,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -3184,7 +3478,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3193,7 +3489,10 @@
                       "$ref": "#/components/schemas/BlogPost"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3209,7 +3508,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3229,7 +3528,7 @@
             }
           },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -3239,7 +3538,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -3268,9 +3567,11 @@
     },
     "/blogs/admin/posts/{id}": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsAdminPostsById",
-        "summary": "[Admin] Chi tiết bài viết",
+        "summary": "[Admin] Article details",
         "parameters": [
           {
             "name": "id",
@@ -3300,7 +3601,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3309,7 +3612,10 @@
                       "$ref": "#/components/schemas/BlogPost"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3325,7 +3631,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3372,9 +3678,11 @@
         ]
       },
       "put": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "putBlogsAdminPostsById",
-        "summary": "[Admin] Cập nhật bài viết",
+        "summary": "[Admin] Update the article",
         "parameters": [
           {
             "name": "id",
@@ -3425,7 +3733,11 @@
                   },
                   "status": {
                     "type": "string",
-                    "enum": ["draft", "published", "archived"]
+                    "enum": [
+                      "draft",
+                      "published",
+                      "archived"
+                    ]
                   }
                 }
               }
@@ -3450,7 +3762,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3459,7 +3773,10 @@
                       "$ref": "#/components/schemas/BlogPost"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3475,7 +3792,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3522,9 +3839,11 @@
         ]
       },
       "delete": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "deleteBlogsAdminPostsById",
-        "summary": "[Admin] Xoá bài viết",
+        "summary": "[Admin] Delete post",
         "parameters": [
           {
             "name": "id",
@@ -3554,13 +3873,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -3576,7 +3899,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3625,21 +3948,25 @@
     },
     "/blogs/admin/posts/upload-image": {
       "post": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "postBlogsAdminPostsUploadImage",
-        "summary": "[Admin] Upload ảnh bài viết",
+        "summary": "[Admin] Upload post image",
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["image"],
+                "required": [
+                  "image"
+                ],
                 "properties": {
                   "image": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Maximum 5MB - jpeg/png/pdf"
+                    "description": "Maximum 5MB — jpeg/png/pdf"
                   }
                 }
               }
@@ -3664,7 +3991,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3680,10 +4009,16 @@
                           "type": "string"
                         }
                       },
-                      "required": ["imageUrl", "publicId"]
+                      "required": [
+                        "imageUrl",
+                        "publicId"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3699,7 +4034,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -3738,9 +4073,11 @@
     },
     "/blogs/categories": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsCategories",
-        "summary": "Danh mục đang hoạt động",
+        "summary": "Active category",
         "responses": {
           "200": {
             "description": "Success",
@@ -3759,7 +4096,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3771,7 +4110,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3792,9 +4134,11 @@
     },
     "/blogs/latest": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsLatest",
-        "summary": "Bài viết mới nhất",
+        "summary": "Latest post",
         "parameters": [
           {
             "name": "limit",
@@ -3825,7 +4169,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3837,7 +4183,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3868,9 +4217,11 @@
     },
     "/blogs/related/{id}": {
       "get": {
-        "tags": ["blogs"],
+        "tags": [
+          "blogs"
+        ],
         "operationId": "getBlogsRelatedById",
-        "summary": "Bài viết liên quan",
+        "summary": "Related articles",
         "parameters": [
           {
             "name": "id",
@@ -3900,7 +4251,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3912,7 +4265,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -3953,9 +4309,11 @@
     },
     "/chat/conversations": {
       "get": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "getChatConversations",
-        "summary": "Danh sách hội thoại 1-1",
+        "summary": "List of 1-on-1 conversations",
         "responses": {
           "200": {
             "description": "Success",
@@ -3974,7 +4332,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -3986,13 +4346,16 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4021,9 +4384,11 @@
     },
     "/chat/conversations/{otherUserId}": {
       "delete": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "deleteChatConversationsByOtherUserId",
-        "summary": "Xoá cả hội thoại",
+        "summary": "Delete entire conversation",
         "parameters": [
           {
             "name": "otherUserId",
@@ -4053,13 +4418,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -4075,7 +4444,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4114,9 +4483,11 @@
     },
     "/chat/conversations/start": {
       "post": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "postChatConversationsStart",
-        "summary": "Bắt đầu / lấy hội thoại với một user",
+        "summary": "Start / initiate a conversation with a user",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -4142,7 +4513,9 @@
                     "format": "uuid"
                   }
                 },
-                "required": ["otherUserId"]
+                "required": [
+                  "otherUserId"
+                ]
               }
             }
           }
@@ -4161,7 +4534,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -4172,7 +4547,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -4181,7 +4558,10 @@
                       "$ref": "#/components/schemas/Conversation"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -4197,7 +4577,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4207,7 +4587,7 @@
             }
           },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4217,7 +4597,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -4246,9 +4626,11 @@
     },
     "/chat/messages": {
       "post": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "postChatMessages",
-        "summary": "Gửi tin nhắn 1-1",
+        "summary": "Send a 1-on-1 message",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -4280,14 +4662,21 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["text", "image", "file"]
+                    "enum": [
+                      "text",
+                      "image",
+                      "file"
+                    ]
                   },
                   "fileUrl": {
                     "type": "string",
                     "maxLength": 2048
                   }
                 },
-                "required": ["receiverId", "content"]
+                "required": [
+                  "receiverId",
+                  "content"
+                ]
               }
             }
           }
@@ -4306,7 +4695,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -4317,7 +4708,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -4326,7 +4719,10 @@
                       "$ref": "#/components/schemas/DirectMessage"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -4342,7 +4738,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4352,7 +4748,7 @@
             }
           },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4362,7 +4758,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -4391,9 +4787,11 @@
     },
     "/chat/messages/{messageId}": {
       "delete": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "deleteChatMessagesByMessageId",
-        "summary": "Xoá một tin nhắn",
+        "summary": "Delete a message",
         "parameters": [
           {
             "name": "messageId",
@@ -4423,13 +4821,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -4445,7 +4847,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4484,10 +4886,12 @@
     },
     "/chat/messages/{otherUserId}": {
       "get": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "getChatMessagesByOtherUserId",
-        "summary": "Tin nhắn với một user",
-        "description": "Phân trang kiểu cũ: `data.{messages,total,hasMore}`; `messages` đã sắp xếp cũ → mới.",
+        "summary": "Messages with a user",
+        "description": "Legacy-style pagination: `data.{messages,total,hasMore}`; `messages` are sorted from oldest to newest.",
         "parameters": [
           {
             "name": "otherUserId",
@@ -4538,7 +4942,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -4559,10 +4965,17 @@
                           "type": "boolean"
                         }
                       },
-                      "required": ["messages", "total", "hasMore"]
+                      "required": [
+                        "messages",
+                        "total",
+                        "hasMore"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -4578,7 +4991,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4617,9 +5030,11 @@
     },
     "/chat/messages/{otherUserId}/read": {
       "put": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "putChatMessagesByOtherUserIdRead",
-        "summary": "Đánh dấu hội thoại đã đọc",
+        "summary": "Mark conversation as read",
         "parameters": [
           {
             "name": "otherUserId",
@@ -4649,13 +5064,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -4671,7 +5090,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4710,9 +5129,11 @@
     },
     "/chat/unread-count": {
       "get": {
-        "tags": ["chat"],
+        "tags": [
+          "chat"
+        ],
         "operationId": "getChatUnreadCount",
-        "summary": "Tổng tin nhắn chưa đọc",
+        "summary": "Total unread messages",
         "responses": {
           "200": {
             "description": "Success",
@@ -4731,7 +5152,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -4743,16 +5166,21 @@
                           "type": "integer"
                         }
                       },
-                      "required": ["count"]
+                      "required": [
+                        "count"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -4781,9 +5209,11 @@
     },
     "/companies": {
       "get": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "getCompanies",
-        "summary": "Danh sách công ty",
+        "summary": "List of companies",
         "parameters": [
           {
             "name": "keyword",
@@ -4837,7 +5267,10 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt", "name"]
+              "enum": [
+                "createdAt",
+                "name"
+              ]
             }
           },
           {
@@ -4846,7 +5279,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -4868,7 +5306,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -4883,7 +5323,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -4912,9 +5356,11 @@
         "security": []
       },
       "post": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "postCompanies",
-        "summary": "Tạo hồ sơ công ty",
+        "summary": "Create a company profile",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -4949,7 +5395,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -4961,7 +5409,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -4973,7 +5423,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -4985,7 +5437,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -4997,7 +5451,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5009,7 +5465,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5021,7 +5479,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5032,7 +5492,9 @@
                     }
                   }
                 },
-                "required": ["name"]
+                "required": [
+                  "name"
+                ]
               }
             }
           }
@@ -5051,7 +5513,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -5062,7 +5526,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5071,7 +5537,10 @@
                       "$ref": "#/components/schemas/Company"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -5087,7 +5556,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5117,7 +5586,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -5146,9 +5615,11 @@
     },
     "/companies/{id}": {
       "get": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "getCompaniesById",
-        "summary": "Chi tiết công ty",
+        "summary": "Company details",
         "parameters": [
           {
             "name": "id",
@@ -5178,7 +5649,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5187,7 +5660,10 @@
                       "$ref": "#/components/schemas/Company"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -5226,9 +5702,11 @@
         "security": []
       },
       "put": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "putCompaniesById",
-        "summary": "Cập nhật công ty",
+        "summary": "Company update",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -5261,7 +5739,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5273,7 +5753,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5285,7 +5767,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5297,7 +5781,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5309,7 +5795,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5321,7 +5809,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5333,7 +5823,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5366,7 +5858,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5375,7 +5869,10 @@
                       "$ref": "#/components/schemas/Company"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -5391,7 +5888,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5438,9 +5935,11 @@
         ]
       },
       "delete": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "deleteCompaniesById",
-        "summary": "Xoá công ty",
+        "summary": "Delete company",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -5471,13 +5970,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -5493,7 +5996,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5542,9 +6045,11 @@
     },
     "/companies/{id}/jobs": {
       "get": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "getCompaniesByIdJobs",
-        "summary": "Việc làm của một công ty",
+        "summary": "A company's operations",
         "parameters": [
           {
             "name": "id",
@@ -5583,7 +6088,12 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt", "title", "salaryMin", "salaryMax"]
+              "enum": [
+                "createdAt",
+                "title",
+                "salaryMin",
+                "salaryMax"
+              ]
             }
           },
           {
@@ -5592,7 +6102,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -5614,7 +6129,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5629,7 +6146,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -5670,9 +6191,11 @@
     },
     "/companies/my": {
       "get": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "getCompaniesMy",
-        "summary": "Công ty của tôi",
+        "summary": "My company",
         "description": "**Role:** employer",
         "responses": {
           "200": {
@@ -5692,7 +6215,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5701,13 +6226,16 @@
                       "$ref": "#/components/schemas/Company"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5746,9 +6274,11 @@
     },
     "/companies/upload-logo": {
       "post": {
-        "tags": ["companies"],
+        "tags": [
+          "companies"
+        ],
         "operationId": "postCompaniesUploadLogo",
-        "summary": "Upload logo công ty",
+        "summary": "Upload company logo",
         "description": "**Rate limit:** uploadLimiter",
         "requestBody": {
           "required": true,
@@ -5756,12 +6286,14 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["image"],
+                "required": [
+                  "image"
+                ],
                 "properties": {
                   "image": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Maximum 5MB - jpeg/png/pdf"
+                    "description": "Maximum 5MB — jpeg/png/pdf"
                   }
                 }
               }
@@ -5786,7 +6318,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5802,10 +6336,16 @@
                           "type": "string"
                         }
                       },
-                      "required": ["logoUrl", "publicId"]
+                      "required": [
+                        "logoUrl",
+                        "publicId"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -5821,7 +6361,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5860,10 +6400,12 @@
     },
     "/groups": {
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "getGroups",
-        "summary": "Nhóm của tôi",
-        "description": "`search` lọc theo tên nhóm. Sắp xếp theo tin nhắn mới nhất, nhóm chưa có tin ở cuối.",
+        "summary": "My group",
+        "description": "`search` filters by group name. Results are sorted by the most recent message, with groups containing no messages appearing at the end.",
         "parameters": [
           {
             "name": "search",
@@ -5893,7 +6435,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -5905,23 +6449,16 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -5941,16 +6478,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       },
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroups",
-        "summary": "Tạo nhóm",
+        "summary": "Create group",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -5984,7 +6519,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -5998,7 +6535,9 @@
                     }
                   }
                 },
-                "required": ["name"]
+                "required": [
+                  "name"
+                ]
               }
             }
           }
@@ -6017,7 +6556,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -6028,7 +6569,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -6052,11 +6595,19 @@
                           "type": "string"
                         }
                       },
-                      "required": ["id", "name", "description", "avatar"],
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "avatar"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -6071,18 +6622,8 @@
               }
             }
           },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6092,7 +6633,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -6112,16 +6653,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}": {
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "getGroupsByGroupId",
         "summary": "Group details",
         "parameters": [
@@ -6153,7 +6692,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -6162,23 +6703,16 @@
                       "$ref": "#/components/schemas/GroupDetail"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6208,14 +6742,12 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       },
       "patch": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "patchGroupsByGroupId",
         "summary": "Group update (group admin)",
         "parameters": [
@@ -6249,7 +6781,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -6261,7 +6795,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   }
@@ -6288,7 +6824,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -6312,27 +6850,25 @@
                           "type": "string"
                         }
                       },
-                      "required": ["id", "name", "description", "avatar"],
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "avatar"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6362,16 +6898,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/invitations/accept": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdInvitationsAccept",
         "summary": "Accept the invitation",
         "parameters": [
@@ -6403,29 +6937,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6455,16 +6983,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/invitations/reject": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdInvitationsReject",
         "summary": "Declining an invitation",
         "parameters": [
@@ -6496,29 +7022,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6548,16 +7068,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/leave": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdLeave",
         "summary": "Leave group",
         "parameters": [
@@ -6589,29 +7107,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6641,16 +7153,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/media": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdMedia",
         "summary": "Upload media for the group",
         "parameters": [
@@ -6670,12 +7180,14 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file"],
+                "required": [
+                  "file"
+                ],
                 "properties": {
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Maximum 5MB - jpeg/png/pdf"
+                    "description": "Maximum 5MB — jpeg/png/pdf"
                   }
                 }
               }
@@ -6700,7 +7212,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -6729,27 +7243,22 @@
                           "type": "string"
                         }
                       },
-                      "required": ["fileUrl"],
+                      "required": [
+                        "fileUrl"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6779,16 +7288,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/members": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdMembers",
         "summary": "Invite members",
         "parameters": [
@@ -6819,7 +7326,9 @@
                     }
                   }
                 },
-                "required": ["userIds"]
+                "required": [
+                  "userIds"
+                ]
               }
             }
           }
@@ -6842,7 +7351,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -6865,26 +7376,22 @@
                           }
                         }
                       },
-                      "required": ["invited", "skipped"]
+                      "required": [
+                        "invited",
+                        "skipped"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -6914,16 +7421,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/members/{targetUserId}": {
       "delete": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "deleteGroupsByGroupIdMembersByTargetUserId",
         "summary": "Remove member (group admin)",
         "parameters": [
@@ -6964,29 +7469,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7016,18 +7515,16 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/members/{targetUserId}/promote": {
       "put": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "putGroupsByGroupIdMembersByTargetUserIdPromote",
-        "summary": "Promoted to group admin",
+        "summary": "Promote to group admin role",
         "parameters": [
           {
             "name": "groupId",
@@ -7066,29 +7563,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7118,16 +7609,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/messages": {
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "getGroupsByGroupIdMessages",
         "summary": "Group messages",
         "description": "`data.{total,hasMore}` is RETAINED for compatibility; the frontend (FE) should migrate to the standard `pagination` structure and subsequently remove these two fields. `search` filters based on content.",
@@ -7190,7 +7679,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -7211,29 +7702,27 @@
                           "type": "boolean"
                         }
                       },
-                      "required": ["messages", "total", "hasMore"]
+                      "required": [
+                        "messages",
+                        "total",
+                        "hasMore"
+                      ]
                     },
                     "pagination": {
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7263,14 +7752,12 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       },
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "postGroupsByGroupIdMessages",
         "summary": "Send a group message",
         "parameters": [
@@ -7309,7 +7796,12 @@
                   "type": {
                     "default": "text",
                     "type": "string",
-                    "enum": ["text", "image", "file", "video"]
+                    "enum": [
+                      "text",
+                      "image",
+                      "file",
+                      "video"
+                    ]
                   },
                   "fileUrl": {
                     "type": "string",
@@ -7352,7 +7844,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -7363,7 +7857,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -7372,23 +7868,16 @@
                       "$ref": "#/components/schemas/GroupMessage"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7408,7 +7897,7 @@
             }
           },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -7418,7 +7907,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -7438,16 +7927,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/messages/{messageId}": {
       "delete": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "deleteGroupsByGroupIdMessagesByMessageId",
         "summary": "Delete group messages",
         "parameters": [
@@ -7488,29 +7975,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7540,16 +8021,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/{groupId}/read": {
       "put": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "putGroupsByGroupIdRead",
         "summary": "Mark group as read",
         "parameters": [
@@ -7581,29 +8060,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -7633,16 +8106,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/groups/invitations/pending": {
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "operationId": "getGroupsInvitationsPending",
         "summary": "Group invitation pending",
         "responses": {
@@ -7663,7 +8134,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -7675,17 +8148,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -7701,16 +8167,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/health": {
       "get": {
-        "tags": ["system"],
+        "tags": [
+          "system"
+        ],
         "operationId": "getHealth",
         "summary": "Liveness check",
         "security": [],
@@ -7724,7 +8188,9 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["ok"]
+                      "enum": [
+                        "ok"
+                      ]
                     }
                   }
                 }
@@ -7741,9 +8207,11 @@
     },
     "/jobs": {
       "get": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "getJobs",
-        "summary": "Job list (filtering, sorting, pagination)",
+        "summary": "Job Listings (filter, sort, paginate)",
         "description": "Log in (optional) to retrieve `isSaved` / `applicationStatus` specific to the viewer. Filter `skills` using the overlap operator (&&) on the `text[]` column.",
         "parameters": [
           {
@@ -7774,7 +8242,12 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt", "title", "salaryMin", "salaryMax"]
+              "enum": [
+                "createdAt",
+                "title",
+                "salaryMin",
+                "salaryMax"
+              ]
             }
           },
           {
@@ -7783,7 +8256,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           },
           {
@@ -7901,7 +8379,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -7916,7 +8396,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -7950,9 +8434,11 @@
         ]
       },
       "post": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "postJobs",
-        "summary": "Post a job opening",
+        "summary": "Post a Job Opening",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -8068,7 +8554,9 @@
                 "description": "true if this is a replayed response",
                 "schema": {
                   "type": "string",
-                  "enum": ["true"]
+                  "enum": [
+                    "true"
+                  ]
                 }
               }
             },
@@ -8079,7 +8567,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8088,13 +8578,16 @@
                       "$ref": "#/components/schemas/Job"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Company profile not yet created - you must create a company profile before posting a job.",
+            "description": "Company profile not found - must create company profile before posting jobs",
             "content": {
               "application/json": {
                 "schema": {
@@ -8104,7 +8597,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8124,7 +8617,7 @@
             }
           },
           "409": {
-            "description": "Conflict (already exists / a request with the same Idempotency-Key is currently in progress)",
+            "description": "Conflict (already exists / request with same Idempotency-Key is running)",
             "content": {
               "application/json": {
                 "schema": {
@@ -8134,7 +8627,7 @@
             }
           },
           "422": {
-            "description": "The Idempotency-Key has already been used with a different payload.",
+            "description": "Idempotency-Key already used with different payload",
             "content": {
               "application/json": {
                 "schema": {
@@ -8163,7 +8656,9 @@
     },
     "/jobs/{id}": {
       "get": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "getJobsById",
         "summary": "Job details",
         "parameters": [
@@ -8195,7 +8690,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8204,7 +8701,10 @@
                       "$ref": "#/components/schemas/JobWithExtras"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -8248,7 +8748,9 @@
         ]
       },
       "put": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "putJobsById",
         "summary": "Recruitment updates",
         "description": "**Role:** employer",
@@ -8360,7 +8862,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8369,7 +8873,10 @@
                       "$ref": "#/components/schemas/Job"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -8385,7 +8892,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8432,7 +8939,9 @@
         ]
       },
       "delete": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "deleteJobsById",
         "summary": "Delete job posting",
         "description": "**Role:** employer",
@@ -8465,13 +8974,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -8487,7 +9000,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8536,9 +9049,11 @@
     },
     "/jobs/{id}/toggle-close": {
       "patch": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "patchJobsByIdToggleClose",
-        "summary": "Open / close job posting",
+        "summary": "Close / Open Job Posting",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -8569,7 +9084,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8581,10 +9098,15 @@
                           "type": "boolean"
                         }
                       },
-                      "required": ["isClosed"]
+                      "required": [
+                        "isClosed"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -8600,7 +9122,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8649,9 +9171,11 @@
     },
     "/jobs/employer": {
       "get": {
-        "tags": ["jobs"],
+        "tags": [
+          "jobs"
+        ],
         "operationId": "getJobsEmployer",
-        "summary": "Job openings at my company",
+        "summary": "My Company's Job Listings",
         "description": "**Role:** employer",
         "parameters": [
           {
@@ -8682,7 +9206,12 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt", "title", "salaryMin", "salaryMax"]
+              "enum": [
+                "createdAt",
+                "title",
+                "salaryMin",
+                "salaryMax"
+              ]
             }
           },
           {
@@ -8691,7 +9220,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -8713,7 +9247,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8728,7 +9264,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -8744,7 +9284,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8783,7 +9323,9 @@
     },
     "/notifications": {
       "get": {
-        "tags": ["notifications"],
+        "tags": [
+          "notifications"
+        ],
         "operationId": "getNotifications",
         "summary": "List of notifications",
         "parameters": [
@@ -8815,7 +9357,9 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt"]
+              "enum": [
+                "createdAt"
+              ]
             }
           },
           {
@@ -8824,7 +9368,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -8846,7 +9395,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -8867,26 +9418,23 @@
                           "type": "integer"
                         }
                       },
-                      "required": ["unreadCount"]
+                      "required": [
+                        "unreadCount"
+                      ]
                     }
                   },
-                  "required": ["success", "data", "pagination", "meta"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination",
+                    "meta"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8906,16 +9454,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/notifications/{id}": {
       "delete": {
-        "tags": ["notifications"],
+        "tags": [
+          "notifications"
+        ],
         "operationId": "deleteNotificationsById",
         "summary": "Clear notifications",
         "parameters": [
@@ -8947,29 +9493,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -8999,16 +9539,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/notifications/{id}/read": {
       "put": {
-        "tags": ["notifications"],
+        "tags": [
+          "notifications"
+        ],
         "operationId": "putNotificationsByIdRead",
         "summary": "Mark as read",
         "parameters": [
@@ -9040,29 +9578,23 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
           },
           "400": {
             "description": "Submitted data is invalid (field-level errors in `errors`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9092,16 +9624,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/notifications/read-all": {
       "put": {
-        "tags": ["notifications"],
+        "tags": [
+          "notifications"
+        ],
         "operationId": "putNotificationsReadAll",
         "summary": "Mark all as read",
         "responses": {
@@ -9122,23 +9652,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -9154,16 +9678,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/notifications/unread-count": {
       "get": {
-        "tags": ["notifications"],
+        "tags": [
+          "notifications"
+        ],
         "operationId": "getNotificationsUnreadCount",
         "summary": "Number of unread notifications",
         "responses": {
@@ -9184,7 +9706,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9196,20 +9720,15 @@
                           "type": "integer"
                         }
                       },
-                      "required": ["count"]
+                      "required": [
+                        "count"
+                      ]
                     }
                   },
-                  "required": ["success", "data"]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in / access token expired or revoked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -9225,16 +9744,14 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/saved-jobs/{jobId}": {
       "post": {
-        "tags": ["saved-jobs"],
+        "tags": [
+          "saved-jobs"
+        ],
         "operationId": "postSavedJobsByJobId",
         "summary": "Save job",
         "parameters": [
@@ -9266,7 +9783,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9275,7 +9794,10 @@
                       "$ref": "#/components/schemas/SavedJob"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -9291,7 +9813,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9328,7 +9850,9 @@
         ]
       },
       "delete": {
-        "tags": ["saved-jobs"],
+        "tags": [
+          "saved-jobs"
+        ],
         "operationId": "deleteSavedJobsByJobId",
         "summary": "Remove saved job",
         "parameters": [
@@ -9360,13 +9884,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -9382,7 +9910,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9421,7 +9949,9 @@
     },
     "/saved-jobs/my": {
       "get": {
-        "tags": ["saved-jobs"],
+        "tags": [
+          "saved-jobs"
+        ],
         "operationId": "getSavedJobsMy",
         "summary": "Saved jobs",
         "parameters": [
@@ -9453,7 +9983,10 @@
             "schema": {
               "default": "createdAt",
               "type": "string",
-              "enum": ["createdAt", "title"]
+              "enum": [
+                "createdAt",
+                "title"
+              ]
             }
           },
           {
@@ -9462,7 +9995,12 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc", "ASC", "DESC"]
+              "enum": [
+                "asc",
+                "desc",
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -9484,7 +10022,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9499,7 +10039,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -9515,7 +10059,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9544,10 +10088,12 @@
     },
     "/users/{id}": {
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "getUsersById",
-        "summary": "Public profile",
-        "description": "The `resume` field is only present when the viewer is an employer or the owner themselves.",
+        "summary": "Public Profile",
+        "description": "Field `resume` only available when the viewer is an employer or the owner.",
         "parameters": [
           {
             "name": "id",
@@ -9588,7 +10134,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9597,7 +10145,10 @@
                       "$ref": "#/components/schemas/PublicProfile"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -9643,10 +10194,12 @@
     },
     "/users/experience": {
       "post": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "postUsersExperience",
-        "summary": "Add experience",
-        "description": "Return the ENTIRE experience array after the addition.",
+        "summary": "Add Experience",
+        "description": "Returns the entire experience array after adding.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9672,7 +10225,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -9693,12 +10248,19 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   }
                 },
-                "required": ["title", "company", "description", "startDate"]
+                "required": [
+                  "title",
+                  "company",
+                  "description",
+                  "startDate"
+                ]
               }
             }
           }
@@ -9721,7 +10283,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9733,7 +10297,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -9749,7 +10316,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9778,10 +10345,12 @@
     },
     "/users/experience/{id}": {
       "patch": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "patchUsersExperienceById",
-        "summary": "Refining experience",
-        "description": "Return the entire experience array.",
+        "summary": "Edit Experience",
+        "description": "Returns the entire experience array.",
         "parameters": [
           {
             "name": "id",
@@ -9818,7 +10387,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -9839,7 +10410,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   }
@@ -9866,7 +10439,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9878,7 +10453,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -9894,7 +10472,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -9931,10 +10509,12 @@
         ]
       },
       "delete": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "deleteUsersExperienceById",
-        "summary": "Clear experience",
-        "description": "Return the entire remaining `experience` array.",
+        "summary": "Delete Experience",
+        "description": "Returns the entire experience array.",
         "parameters": [
           {
             "name": "id",
@@ -9975,7 +10555,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -9987,7 +10569,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10003,7 +10588,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10042,9 +10627,11 @@
     },
     "/users/me": {
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "getUsersMe",
-        "summary": "My profile",
+        "summary": "My Profile",
         "requestBody": {
           "required": false,
           "content": {
@@ -10074,7 +10661,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10083,7 +10672,10 @@
                       "$ref": "#/components/schemas/MyProfile"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10099,7 +10691,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10128,9 +10720,11 @@
     },
     "/users/profile": {
       "patch": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "patchUsersProfile",
-        "summary": "Update profile",
+        "summary": "Update Profile",
         "requestBody": {
           "required": false,
           "content": {
@@ -10151,7 +10745,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10163,7 +10759,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10175,7 +10773,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10187,7 +10787,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10199,13 +10801,19 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
                   "workPreference": {
                     "type": "string",
-                    "enum": ["onsite", "remote", "hybrid"]
+                    "enum": [
+                      "onsite",
+                      "remote",
+                      "hybrid"
+                    ]
                   },
                   "hourlyRateMin": {
                     "anyOf": [
@@ -10216,7 +10824,9 @@
                       {
                         "type": "string",
                         "nullable": true,
-                        "enum": [null]
+                        "enum": [
+                          null
+                        ]
                       }
                     ]
                   },
@@ -10229,7 +10839,9 @@
                       {
                         "type": "string",
                         "nullable": true,
-                        "enum": [null]
+                        "enum": [
+                          null
+                        ]
                       }
                     ]
                   },
@@ -10240,7 +10852,11 @@
                   },
                   "availabilityStatus": {
                     "type": "string",
-                    "enum": ["available", "busy", "unavailable"]
+                    "enum": [
+                      "available",
+                      "busy",
+                      "unavailable"
+                    ]
                   },
                   "skills": {
                     "maxItems": 50,
@@ -10274,7 +10890,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10283,7 +10901,10 @@
                       "$ref": "#/components/schemas/MyProfile"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10299,7 +10920,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10328,10 +10949,12 @@
     },
     "/users/projects": {
       "post": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "postUsersProjects",
-        "summary": "Add project",
-        "description": "Return the ENTIRE projects array.",
+        "summary": "Add Project",
+        "description": "Returns the entire projects array.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10365,7 +10988,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10377,12 +11002,18 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   }
                 },
-                "required": ["title", "description", "technologies"]
+                "required": [
+                  "title",
+                  "description",
+                  "technologies"
+                ]
               }
             }
           }
@@ -10405,7 +11036,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10417,7 +11050,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10433,7 +11069,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10462,9 +11098,11 @@
     },
     "/users/projects/{id}": {
       "patch": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "patchUsersProjectsById",
-        "summary": "Edit project",
+        "summary": "Edit Project",
         "parameters": [
           {
             "name": "id",
@@ -10509,7 +11147,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   },
@@ -10521,7 +11161,9 @@
                       },
                       {
                         "type": "string",
-                        "enum": [""]
+                        "enum": [
+                          ""
+                        ]
                       }
                     ]
                   }
@@ -10548,7 +11190,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10560,7 +11204,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10576,7 +11223,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10613,9 +11260,11 @@
         ]
       },
       "delete": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "deleteUsersProjectsById",
-        "summary": "Delete project",
+        "summary": "Delete Project",
         "parameters": [
           {
             "name": "id",
@@ -10656,7 +11305,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10668,7 +11319,10 @@
                       }
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -10684,7 +11338,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10723,9 +11377,11 @@
     },
     "/users/resume": {
       "delete": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "deleteUsersResume",
-        "summary": "Delete CV / Resume",
+        "summary": "Delete CV",
         "requestBody": {
           "required": false,
           "content": {
@@ -10755,13 +11411,17 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
                     }
                   },
-                  "required": ["success"]
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
@@ -10777,7 +11437,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -10806,9 +11466,11 @@
     },
     "/users/search": {
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "operationId": "getUsersSearch",
-        "summary": "Search for users / candidates",
+        "summary": "Search users / candidates",
         "parameters": [
           {
             "name": "q",
@@ -10885,7 +11547,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "message": {
                       "type": "string"
@@ -10932,17 +11596,21 @@
                           "workPreference": {
                             "nullable": true,
                             "type": "string",
-                            "enum": ["onsite", "remote", "hybrid"]
+                            "enum": [
+                              "onsite",
+                              "remote",
+                              "hybrid"
+                            ]
                           },
                           "hourlyRateMin": {
                             "nullable": true,
                             "type": "string",
-                            "description": "Decimal value in string format"
+                            "description": "Decimal as a string (Postgres decimal)"
                           },
                           "hourlyRateMax": {
                             "nullable": true,
                             "type": "string",
-                            "description": "Decimal value in string format"
+                            "description": "Decimal as a string (Postgres decimal)"
                           },
                           "completionRate": {
                             "type": "integer"
@@ -10955,7 +11623,11 @@
                           },
                           "availabilityStatus": {
                             "type": "string",
-                            "enum": ["available", "busy", "unavailable"]
+                            "enum": [
+                              "available",
+                              "busy",
+                              "unavailable"
+                            ]
                           },
                           "skills": {
                             "nullable": true,
@@ -10980,7 +11652,7 @@
                           },
                           "rating": {
                             "type": "string",
-                            "description": "Decimal value in string format"
+                            "description": "Decimal as a string (Postgres decimal)"
                           },
                           "reviewCount": {
                             "type": "integer"
@@ -11003,7 +11675,11 @@
                       "$ref": "#/components/schemas/PaginationMeta"
                     }
                   },
-                  "required": ["success", "data", "pagination"]
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
                 }
               }
             }
@@ -11019,7 +11695,7 @@
             }
           },
           "401": {
-            "description": "Not logged in / access token expired or revoked",
+            "description": "Not authenticated / access token expired or revoked",
             "content": {
               "application/json": {
                 "schema": {
@@ -11070,7 +11746,11 @@
             "format": "date-time"
           }
         },
-        "required": ["id", "createdAt", "expiresAt"]
+        "required": [
+          "id",
+          "createdAt",
+          "expiresAt"
+        ]
       },
       "AIMatchingAnalysis": {
         "type": "object",
@@ -11128,7 +11808,9 @@
         "properties": {
           "success": {
             "type": "boolean",
-            "enum": [false]
+            "enum": [
+              false
+            ]
           },
           "message": {
             "type": "string"
@@ -11140,15 +11822,19 @@
             }
           },
           "code": {
-            "description": "Machine-readable error code (e.g., TOKEN_EXPIRED) - present only for certain errors",
+            "description": "Error code readable by machines (e.g., TOKEN_EXPIRED) — only present in some errors",
             "type": "string"
           },
           "requestId": {
-            "description": "Duplicate X-Request-Id header - include this when reporting an error",
+            "description": "Matches header X-Request-Id — sent along with error reports",
             "type": "string"
           }
         },
-        "required": ["success", "message", "errors"]
+        "required": [
+          "success",
+          "message",
+          "errors"
+        ]
       },
       "Application": {
         "type": "object",
@@ -11198,7 +11884,7 @@
             "format": "date-time"
           },
           "job": {
-            "description": "Available in list/detail views; field sets vary by endpoint.",
+            "description": "Only available in the detail/list endpoint",
             "type": "object",
             "properties": {
               "id": {
@@ -11241,10 +11927,13 @@
                 "additionalProperties": {}
               }
             },
-            "required": ["id", "title"]
+            "required": [
+              "id",
+              "title"
+            ]
           },
           "applicant": {
-            "description": "Available in the employer-facing endpoint",
+            "description": "Only available in the endpoint for employers",
             "type": "object",
             "properties": {
               "id": {
@@ -11267,7 +11956,13 @@
                 "type": "string"
               }
             },
-            "required": ["id", "name", "email", "avatar", "resume"]
+            "required": [
+              "id",
+              "name",
+              "email",
+              "avatar",
+              "resume"
+            ]
           }
         },
         "required": [
@@ -11353,7 +12048,10 @@
           },
           "type": {
             "type": "string",
-            "enum": ["portal_news", "industry_news"]
+            "enum": [
+              "portal_news",
+              "industry_news"
+            ]
           },
           "isActive": {
             "type": "boolean"
@@ -11397,7 +12095,7 @@
           },
           "content": {
             "type": "string",
-            "description": "HTML. Not on the shortlist"
+            "description": "HTML. Not available in the abbreviated list"
           },
           "thumbnail": {
             "nullable": true,
@@ -11405,7 +12103,11 @@
           },
           "status": {
             "type": "string",
-            "enum": ["draft", "published", "archived"]
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
           },
           "viewCount": {
             "type": "integer"
@@ -11438,7 +12140,10 @@
                 "type": "string"
               }
             },
-            "required": ["id", "name"]
+            "required": [
+              "id",
+              "name"
+            ]
           },
           "category": {
             "allOf": [
@@ -11491,7 +12196,11 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "slug"],
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
         "additionalProperties": {}
       },
       "Company": {
@@ -11577,7 +12286,11 @@
                 "type": "string"
               }
             },
-            "required": ["id", "name", "email"]
+            "required": [
+              "id",
+              "name",
+              "email"
+            ]
           }
         },
         "required": [
@@ -11621,7 +12334,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "logo", "industry", "size"]
+        "required": [
+          "id",
+          "name",
+          "logo",
+          "industry",
+          "size"
+        ]
       },
       "Conversation": {
         "type": "object",
@@ -11689,7 +12408,12 @@
                 "format": "email"
               }
             },
-            "required": ["id", "name", "avatar", "email"]
+            "required": [
+              "id",
+              "name",
+              "avatar",
+              "email"
+            ]
           },
           "lastMessage": {
             "nullable": true,
@@ -11737,7 +12461,11 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "image", "file"]
+            "enum": [
+              "text",
+              "image",
+              "file"
+            ]
           },
           "fileUrl": {
             "nullable": true,
@@ -11804,7 +12532,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["activeJobs", "applications", "totalHired"],
+                "required": [
+                  "activeJobs",
+                  "applications",
+                  "totalHired"
+                ],
                 "description": "% change over the last 7 days compared to the preceding 7 days"
               }
             },
@@ -11894,7 +12626,12 @@
                           "type": "string"
                         }
                       },
-                      "required": ["id", "name", "email", "avatar"]
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "avatar"
+                      ]
                     },
                     "job": {
                       "nullable": true,
@@ -11908,7 +12645,10 @@
                           "type": "string"
                         }
                       },
-                      "required": ["id", "title"]
+                      "required": [
+                        "id",
+                        "title"
+                      ]
                     }
                   },
                   "required": [
@@ -11922,10 +12662,16 @@
                 }
               }
             },
-            "required": ["recentJobs", "recentApplications"]
+            "required": [
+              "recentJobs",
+              "recentApplications"
+            ]
           }
         },
-        "required": ["counts", "data"]
+        "required": [
+          "counts",
+          "data"
+        ]
       },
       "Experience": {
         "type": "object",
@@ -11952,21 +12698,30 @@
             "type": "string"
           }
         },
-        "required": ["id", "title", "company", "description", "startDate"]
+        "required": [
+          "id",
+          "title",
+          "company",
+          "description",
+          "startDate"
+        ]
       },
       "FieldError": {
         "type": "object",
         "properties": {
           "field": {
             "nullable": true,
-            "description": "Name of the faulty field; null if the error is general",
+            "description": "Name of the field with an error, null if it's a general error",
             "type": "string"
           },
           "message": {
             "type": "string"
           }
         },
-        "required": ["field", "message"]
+        "required": [
+          "field",
+          "message"
+        ]
       },
       "GroupDetail": {
         "type": "object",
@@ -11997,7 +12752,10 @@
                 "type": "string"
               }
             },
-            "required": ["id", "name"]
+            "required": [
+              "id",
+              "name"
+            ]
           },
           "members": {
             "type": "array",
@@ -12042,7 +12800,10 @@
                       "type": "string"
                     }
                   },
-                  "required": ["id", "name"]
+                  "required": [
+                    "id",
+                    "name"
+                  ]
                 }
               },
               "required": [
@@ -12100,7 +12861,12 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "image", "file", "video"]
+            "enum": [
+              "text",
+              "image",
+              "file",
+              "video"
+            ]
           },
           "fileUrl": {
             "nullable": true,
@@ -12142,7 +12908,13 @@
                 "type": "boolean"
               }
             },
-            "required": ["id", "content", "senderId", "senderName", "isDeleted"]
+            "required": [
+              "id",
+              "content",
+              "senderId",
+              "senderName",
+              "isDeleted"
+            ]
           },
           "seenBy": {
             "type": "array",
@@ -12158,7 +12930,10 @@
                   "format": "date-time"
                 }
               },
-              "required": ["userId", "seenAt"]
+              "required": [
+                "userId",
+                "seenAt"
+              ]
             }
           },
           "seenByMe": {
@@ -12193,7 +12968,10 @@
       },
       "GroupRole": {
         "type": "string",
-        "enum": ["admin", "member"]
+        "enum": [
+          "admin",
+          "member"
+        ]
       },
       "GroupSummary": {
         "type": "object",
@@ -12260,7 +13038,13 @@
                   "$ref": "#/components/schemas/GroupRole"
                 }
               },
-              "required": ["id", "name", "avatar", "email", "role"]
+              "required": [
+                "id",
+                "name",
+                "avatar",
+                "email",
+                "role"
+              ]
             }
           },
           "createdAt": {
@@ -12321,12 +13105,12 @@
           "salaryMin": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "salaryMax": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "skills": {
             "nullable": true,
@@ -12379,7 +13163,14 @@
       },
       "JobLevel": {
         "type": "string",
-        "enum": ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead"]
+        "enum": [
+          "Intern",
+          "Fresher",
+          "Junior",
+          "Middle",
+          "Senior",
+          "Lead"
+        ]
       },
       "JobType": {
         "type": "string",
@@ -12431,12 +13222,12 @@
           "salaryMin": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "salaryMax": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "skills": {
             "nullable": true,
@@ -12474,7 +13265,7 @@
           },
           "applicationStatus": {
             "nullable": true,
-            "description": "Application status for the viewer; null if they have not yet applied.",
+            "description": "Application status of the viewer, null if not applied",
             "type": "string"
           }
         },
@@ -12534,17 +13325,21 @@
           "workPreference": {
             "nullable": true,
             "type": "string",
-            "enum": ["onsite", "remote", "hybrid"]
+            "enum": [
+              "onsite",
+              "remote",
+              "hybrid"
+            ]
           },
           "hourlyRateMin": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "hourlyRateMax": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "completionRate": {
             "type": "integer"
@@ -12557,7 +13352,11 @@
           },
           "availabilityStatus": {
             "type": "string",
-            "enum": ["available", "busy", "unavailable"]
+            "enum": [
+              "available",
+              "busy",
+              "unavailable"
+            ]
           },
           "skills": {
             "nullable": true,
@@ -12582,7 +13381,7 @@
           },
           "rating": {
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "reviewCount": {
             "type": "integer"
@@ -12682,7 +13481,11 @@
       },
       "NotificationType": {
         "type": "string",
-        "enum": ["application_status_updated", "job_applied", "job_saved"]
+        "enum": [
+          "application_status_updated",
+          "job_applied",
+          "job_saved"
+        ]
       },
       "PaginationMeta": {
         "type": "object",
@@ -12776,7 +13579,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "title", "description", "technologies"]
+        "required": [
+          "id",
+          "title",
+          "description",
+          "technologies"
+        ]
       },
       "PublicProfile": {
         "type": "object",
@@ -12814,17 +13622,21 @@
           "workPreference": {
             "nullable": true,
             "type": "string",
-            "enum": ["onsite", "remote", "hybrid"]
+            "enum": [
+              "onsite",
+              "remote",
+              "hybrid"
+            ]
           },
           "hourlyRateMin": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "hourlyRateMax": {
             "nullable": true,
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "completionRate": {
             "type": "integer"
@@ -12837,7 +13649,11 @@
           },
           "availabilityStatus": {
             "type": "string",
-            "enum": ["available", "busy", "unavailable"]
+            "enum": [
+              "available",
+              "busy",
+              "unavailable"
+            ]
           },
           "skills": {
             "nullable": true,
@@ -12862,7 +13678,7 @@
           },
           "rating": {
             "type": "string",
-            "description": "Decimal value in string format"
+            "description": "Decimal as a string (Postgres decimal)"
           },
           "reviewCount": {
             "type": "integer"
@@ -12968,7 +13784,13 @@
             ]
           }
         },
-        "required": ["id", "jobId", "jobseekerId", "createdAt", "updatedAt"]
+        "required": [
+          "id",
+          "jobId",
+          "jobseekerId",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "UserRef": {
         "type": "object",
@@ -12985,11 +13807,19 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "avatar"]
+        "required": [
+          "id",
+          "name",
+          "avatar"
+        ]
       },
       "UserRole": {
         "type": "string",
-        "enum": ["jobseeker", "employer", "admin"]
+        "enum": [
+          "jobseeker",
+          "employer",
+          "admin"
+        ]
       }
     },
     "securitySchemes": {
