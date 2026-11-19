@@ -6,23 +6,14 @@ import { logger, morganStream } from "./utils/logger";
 import { requestId } from "./middlewares/requestId.middleware";
 import { requestContext } from "./observability/request-context";
 import { apiLimiter } from "./middlewares/rateLimiter.middleware";
-import authRoutes from "./routes/auth.route";
-import userRoutes from "./routes/user.route";
-import jobRoutes from "./routes/job.route";
-import applicationRoutes from "./routes/application.route";
-import analyticsRoutes from "./routes/analytics.route";
-import savedJobRoutes from "./routes/savedJob.route";
-import companyRoutes from "./routes/company.route";
-import notificationRoutes from "./routes/notification.route";
-import chatRoutes from "./routes/chat.routes";
-import blogRoutes from "./routes/blog.route";
+import { apiRouters } from "./routes";
+import docsRoutes, { warnOpenApiProblems } from "./routes/docs.route";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { API_PREFIX, ROUTES } from "./constants/routes";
 import helmet from "helmet";
 import { config } from "./config/env.config";
 import cookieParser from "cookie-parser";
-import { setupMetrics } from "./middlewares/metrics.middleware";
-import groupChatRoutes from "./routes/group-chat.routes";
+import { recordMountBase, setupMetrics } from "./middlewares/metrics.middleware";
 
 const app: Express = express();
 
@@ -109,17 +100,16 @@ app.get("/health", (_req, res) => {
 // ngưỡng thấp hơn mức chung.
 app.use(API_PREFIX, apiLimiter);
 
-app.use(`${API_PREFIX}${ROUTES.AUTH.BASE}`, authRoutes);
-app.use(`${API_PREFIX}${ROUTES.USERS.BASE}`, userRoutes);
-app.use(`${API_PREFIX}${ROUTES.JOBS.BASE}`, jobRoutes);
-app.use(`${API_PREFIX}${ROUTES.APPLICATIONS.BASE}`, applicationRoutes);
-app.use(`${API_PREFIX}${ROUTES.SAVED_JOBS.BASE}`, savedJobRoutes);
-app.use(`${API_PREFIX}${ROUTES.ANALYTICS.BASE}`, analyticsRoutes);
-app.use(`${API_PREFIX}${ROUTES.COMPANIES.BASE}`, companyRoutes);
-app.use(`${API_PREFIX}${ROUTES.NOTIFICATIONS.BASE}`, notificationRoutes);
-app.use(`${API_PREFIX}${ROUTES.CHAT.BASE}`, chatRoutes);
-app.use(`${API_PREFIX}${ROUTES.BLOGS.BASE}`, blogRoutes);
-app.use(`${API_PREFIX}${ROUTES.GROUPS.BASE}`, groupChatRoutes);
+// Swagger UI + /docs/openapi.json (bật/tắt qua DOCS_ENABLED, xem env.config.ts).
+if (config.docs.enabled) {
+  app.use(ROUTES.DOCS.BASE, docsRoutes);
+  warnOpenApiProblems();
+}
+
+// Danh sách router nằm ở routes/index.ts (dùng chung với OpenAPI generator).
+for (const { base, router } of apiRouters) {
+  app.use(`${API_PREFIX}${base}`, recordMountBase, router);
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

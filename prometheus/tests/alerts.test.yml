@@ -27,7 +27,7 @@ tests:
               }
             exp_annotations:
               summary: "API scrape failed (api:5000)"
-              description: "Prometheus has been unable to scrape /metrics for 2 minutes. Possible causes include a crashed process, out-of-memory conditions, or an incorrect METRICS_TOKEN."
+              description: "API cannot be scraped (api:5000)"
               runbook_url: "docs/observability.md#apidown"
 
   - name: Fast burn fires when 5xx ratio is 10% for an hour
@@ -44,7 +44,7 @@ tests:
           - exp_labels: { severity: critical, area: slo }
             exp_annotations:
               summary: "Fast error budget burn (>14.4x)"
-              description: "The 1-hour 5xx error ratio is 10%. The monthly error budget is being consumed rapidly."
+              description: "5xx rate (1h) = 10%. The monthly error budget is being depleted very quickly."
               runbook_url: "docs/observability.md#sloerrorbudgetfastburn"
 
   - name: Healthy traffic does not burn budget

@@ -1,5 +1,6 @@
 import { AppError } from "./errors";
 import { HTTP_STATUS } from "../constants/httpStatus";
+import { externalCallDuration } from "../observability/metrics";
 
 export class ExternalTimeoutError extends AppError {
   constructor(label: string, ms: number) {
@@ -18,8 +19,21 @@ export const withTimeout = <T>(
   label: string
 ): Promise<T> => {
   let timer: NodeJS.Timeout;
+  const stop = externalCallDuration.startTimer({ service: label });
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new ExternalTimeoutError(label, ms)), ms);
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  // `label` là hằng cố định ("Cloudinary upload", "SMTP sendMail"...) nên an toàn làm label metric.
+  return Promise.race([promise, timeout])
+    .then(
+      (value) => {
+        stop({ result: "ok" });
+        return value;
+      },
+      (error: unknown) => {
+        stop({ result: error instanceof ExternalTimeoutError ? "timeout" : "error" });
+        throw error;
+      }
+    )
+    .finally(() => clearTimeout(timer));
 };

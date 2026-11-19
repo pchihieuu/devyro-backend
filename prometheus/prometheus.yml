@@ -1,13 +1,73 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    env: dev            # prod: đổi thành "production"
+    service: jobportal
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
 
 scrape_configs:
   - job_name: "jobportal-api"
+    metrics_path: /metrics
     static_configs:
       - targets: ["api:5000"]
-    metrics_path: /metrics 
+    # Khi đặt METRICS_TOKEN cho API: tạo file prometheus/secrets/metrics_token
+    # (1 dòng, không xuống dòng cuối) rồi bỏ comment 2 dòng dưới.
+    # authorization:
+    #   credentials_file: /etc/prometheus/secrets/metrics_token
 
+  # Hạ tầng phụ thuộc (chỉ có khi chạy profile "monitoring")
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: "rabbitmq"
+    # plugin rabbitmq_prometheus có sẵn trong image *-management
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  # Probe blackbox: kiểm tra từ NGOÀI vào (bắt cả lỗi proxy/DNS/TLS)
+  - job_name: "blackbox-health"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ["http://api:5000/health"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Chính hệ thống giám sát
   - job_name: "prometheus"
     static_configs:
-      - targets: ["localhost:9090"]  
+      - targets: ["localhost:9090"]
+
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]   # metric nội bộ của collector
+      - targets: ["otel-collector:8889"]   # RED metric sinh từ span (spanmetrics)
+        labels:
+          source: spanmetrics
+
+  - job_name: "tempo"
+    static_configs:
+      - targets: ["tempo:3200"]
