@@ -345,7 +345,7 @@ groups:
         for: 10m
         labels: { severity: warning, area: external }
         annotations:
-          summary: "{{ $labels.service }} p95 latency = {{ $value | humanizeDuration }"
+          summary: "{{ $labels.service }} p95 latency = {{ $value | humanizeDuration }}"
           runbook_url: "docs/observability.md#externalcallslow"
 
   # Realtime / Runtime
