@@ -8,7 +8,7 @@ import { ValidationError, FieldError } from "../utils/errors";
  * ngược lại được params/query/body từ chính router — tài liệu không thể lệch
  * khỏi validator thật.
  */
-export const VALIDATION_SCHEMA = Symbol.for("jobportal.validationSchema");
+export const VALIDATION_SCHEMA = "__jobportalValidationSchema";
 
 interface ValidateData {
   body?: any;

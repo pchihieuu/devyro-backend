@@ -1,3 +1,4 @@
+import { markRateLimiter } from "../openapi/markers";
 import rateLimit from "express-rate-limit";
 import { HTTP_STATUS, HTTP_MESSAGE } from "../constants/httpStatus";
 import { decodeToken } from "../utils/token.utils";
@@ -149,3 +150,12 @@ export const jobCreationLimiter = rateLimit({
   legacyHeaders: false,
   statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
 });
+
+// Cho OpenAPI generator: route nào gắn limiter nào sẽ có response 429 + ghi chú.
+Object.entries({
+  authLimiter,
+  refreshTokenLimiter,
+  publicUploadLimiter,
+  uploadLimiter,
+  jobCreationLimiter,
+}).forEach(([name, limiter]) => markRateLimiter(limiter, name));

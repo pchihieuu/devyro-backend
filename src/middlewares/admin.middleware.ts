@@ -1,3 +1,4 @@
+import { markAdminOnly } from "../openapi/markers";
 import { Request, Response, NextFunction } from "express";
 import { UserRole } from "../entities/User.entity";
 import { HTTP_STATUS } from "../constants/httpStatus";
@@ -19,3 +20,5 @@ export const adminOnly = (
   }
   next();
 };
+
+markAdminOnly(adminOnly);

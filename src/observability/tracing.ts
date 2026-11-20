@@ -31,7 +31,11 @@ import { trace } from "@opentelemetry/api";
  * Cấu hình qua biến chuẩn OTel: OTEL_EXPORTER_OTLP_ENDPOINT,
  * OTEL_EXPORTER_OTLP_HEADERS, OTEL_TRACES_SAMPLER(_ARG), OTEL_SERVICE_NAME.
  */
-export const otelEnabled = Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
+// OTEL_SDK_DISABLED=true là biến chuẩn của OpenTelemetry; script sinh OpenAPI dùng nó
+// để KHÔNG bật instrumentation (instrumentation bọc router → làm sai việc đọc router.stack).
+export const otelEnabled =
+  Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT) &&
+  process.env.OTEL_SDK_DISABLED !== "true";
 
 if (otelEnabled) {
   // NodeSDK đọc 2 biến chuẩn này; đặt mặc định hợp lý nếu chưa cấu hình.

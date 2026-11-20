@@ -8,6 +8,12 @@
  *
  * Không cần DB/Redis thật: chỉ import router để đọc router.stack rồi thoát.
  */
+// Script này chỉ ĐỌC router.stack — phải tắt observability TRƯỚC mọi import. Đặt rỗng (không phải
+// delete) để dotenv không nạp lại giá trị từ .env. Nếu OTel Express instrumentation chạy, nó bọc
+// `router.use(protect)` thành hàm `patched` và spec sinh ra sẽ thiếu security trên máy dev.
+process.env.OTEL_SDK_DISABLED = "true";
+process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "";
+process.env.SENTRY_DSN = "";
 process.env.JWT_SECRET ??= "openapi";
 process.env.JWT_REFRESH_SECRET ??= "openapi";
 process.env.GEMINI_API_KEY ??= "openapi";

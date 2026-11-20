@@ -1,11 +1,9 @@
 import { Router } from "express";
 import { ZodType } from "zod";
 import { apiRouters } from "../routes";
-import { optionalAuth, protect } from "../middlewares/auth.middleware";
-import { adminOnly } from "../middlewares/admin.middleware";
+import { ADMIN_ONLY, AUTH_MODE, RATE_LIMITER } from "./markers";
 import { VALIDATION_SCHEMA } from "../middlewares/validation.middleware";
 import { IDEMPOTENT } from "../middlewares/idempotency.middleware";
-import * as limiters from "../middlewares/rateLimiter.middleware";
 
 /**
  * Đọc router Express THẬT (router.stack) để suy ra method, path, auth,
@@ -30,12 +28,6 @@ export interface RouteInfo {
 
 const METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
-const limiterNames = new Map<unknown, string>(
-  Object.entries(limiters)
-    .filter(([name]) => name.endsWith("Limiter"))
-    .map(([name, fn]) => [fn, name])
-);
-
 interface StackLayer {
   name?: string;
   handle: unknown;
@@ -55,13 +47,18 @@ const analyse = (
   };
 
   for (const h of handlers) {
-    if (h === protect) info.auth = "required";
-    else if (h === optionalAuth && info.auth === "none") info.auth = "optional";
-    else if (h === adminOnly) info.adminOnly = true;
-    else if (limiterNames.has(h)) info.rateLimited.push(limiterNames.get(h)!);
-
     if (typeof h !== "function") continue;
-    const tagged = h as unknown as Record<symbol, unknown>;
+    const tagged = h as unknown as Record<string, unknown>;
+
+    // Nhận diện bằng marker (Symbol.for), KHÔNG so sánh identity hàm — xem markers.ts.
+    const mode = tagged[AUTH_MODE];
+    if (mode === "required") info.auth = "required";
+    else if (mode === "optional" && info.auth === "none") info.auth = "optional";
+    if (tagged[ADMIN_ONLY]) info.adminOnly = true;
+    if (typeof tagged[RATE_LIMITER] === "string") {
+      info.rateLimited.push(tagged[RATE_LIMITER] as string);
+    }
+
     if (tagged[IDEMPOTENT]) info.idempotent = true;
     if (tagged[VALIDATION_SCHEMA]) {
       info.requestSchema = tagged[VALIDATION_SCHEMA] as ZodType;

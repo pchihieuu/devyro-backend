@@ -61,7 +61,7 @@ const parseEntry = (raw: string | null): StoredEntry | null => {
 };
 
 /** Đánh dấu handler để OpenAPI generator tự thêm header Idempotency-Key. */
-export const IDEMPOTENT = Symbol.for("jobportal.idempotent");
+export const IDEMPOTENT = "__jobportalIdempotent";
 
 export const idempotency = (options: { ttlSeconds?: number } = {}) =>
   Object.assign(
