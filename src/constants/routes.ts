@@ -5,6 +5,12 @@ export const ROUTES = {
   HEALTH: {
     CHECK: "/health",
   },
+  DOCS: {
+    BASE: "/docs",
+    SPEC: "/openapi.json",
+    INIT: "/init.js",
+    ASSETS: "/assets",
+  },
   AUTH: {
     BASE: "/auth",
     REGISTER: "/register",

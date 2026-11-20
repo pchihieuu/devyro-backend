@@ -1,3 +1,4 @@
+import { wsConnections } from "../observability/metrics";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { Server as HTTPServer } from "http";
 import { authenticateAccessToken } from "./access-token-auth.service";
@@ -54,6 +55,7 @@ export class WebSocketService {
   private setupConnectionHandlers() {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
       console.log(`User connected: ${socket.userId}`);
+      wsConnections.inc();
 
       if (socket.userId) {
         this.userSockets.set(socket.userId, socket.id);
@@ -129,6 +131,7 @@ export class WebSocketService {
         // đúng với ts-node-dev --respawn), "client namespace disconnect"
         // (client tự chủ động ngắt), v.v. Trước đây log không có `reason`
         // nên không thể xác định server tự restart hay do mạng.
+        wsConnections.dec();
         console.log(`User disconnected: ${socket.userId} (reason: ${reason})`);
         if (socket.userId) {
           // FIX: chỉ xóa khỏi map & báo offline nếu socket.id NÀY vẫn đang

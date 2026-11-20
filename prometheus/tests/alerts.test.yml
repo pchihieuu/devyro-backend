@@ -1,0 +1,105 @@
+#  Run: promtool test rules prometheus/tests/alerts.test.yml (npm run alerts:test)
+rule_files:
+  - ../rules/recording.rules.yml
+  - ../rules/alerts.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: ApiDown fires after 2m of failed scrapes
+    interval: 1m
+    input_series:
+      - series: 'up{job="jobportal-api", instance="api:5000"}'
+        values: "1 1 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApiDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: ApiDown
+        exp_alerts:
+          - exp_labels:
+              {
+                severity: critical,
+                area: availability,
+                job: jobportal-api,
+                instance: "api:5000",
+              }
+            exp_annotations:
+              summary: "API cannot be scraped (api:5000)"
+              description: "API cannot be scraped (api:5000)"
+              runbook_url: "docs/observability.md#apidown"
+
+  - name: Fast burn fires when 5xx ratio is 10% for an hour
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{job="jobportal-api",status_code="200"}'
+        values: "0+54x70" # 0.9 req/s
+      - series: 'http_request_duration_seconds_count{job="jobportal-api",status_code="500"}'
+        values: "0+6x70" # 0.1 req/s  → 10% lỗi
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: SloErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: { severity: critical, area: slo }
+            exp_annotations:
+              summary: "Rapid budget burn due to errors (>14.4x)"
+              description: "5xx rate (1h) = 10%. The monthly error budget is being depleted very quickly."
+              runbook_url: "docs/observability.md#sloerrorbudgetfastburn"
+
+  - name: Healthy traffic does not burn budget
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{job="jobportal-api",status_code="200"}'
+        values: "0+60x70"
+      - series: 'http_request_duration_seconds_count{job="jobportal-api",status_code="500"}'
+        values: "0+0x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: SloErrorBudgetFastBurn
+        exp_alerts: []
+
+  - name: Dead-lettered MQ message pages immediately
+    interval: 1m
+    input_series:
+      - series: 'jobportal_mq_messages_total{queue="group.message",result="dead"}'
+        values: "0 0 0 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: MqMessageDeadLettered
+        exp_alerts:
+          - exp_labels:
+              { severity: critical, area: queue, queue: group.message }
+            exp_annotations:
+              summary: "Messages in queue group.message have been sent to the DLQ"
+              description: "Poison message detected — check the '[MQ] ... exceeded 5 attempts' logs and Sentry. Fix the underlying issue, then manually replay the messages."
+              runbook_url: "docs/observability.md#mqmessagedeadlettered"
+
+  - name: Outbox stuck when pending but nothing published
+    interval: 1m
+    input_series:
+      - series: 'jobportal_outbox_pending{job="jobportal-api"}'
+        values: "5x20"
+      - series: 'jobportal_outbox_events_total{topic="group.message",result="published"}'
+        values: "3x20"
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: OutboxStuck
+        exp_alerts:
+          - exp_labels: { severity: critical, area: outbox, job: jobportal-api }
+            exp_annotations:
+              summary: "Outbox has pending events, but no events have been published in the last 10 minutes"
+              description: "The outboxRelay may have stopped or MQ may be unavailable. Group messages are NOT being delivered in real time."
+              runbook_url: "docs/observability.md#outboxstuck"
+
+  - name: Outbox draining normally does not alert
+    interval: 1m
+    input_series:
+      - series: 'jobportal_outbox_pending{job="jobportal-api"}'
+        values: "5x20"
+      - series: 'jobportal_outbox_events_total{topic="group.message",result="published"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: OutboxStuck
+        exp_alerts: []

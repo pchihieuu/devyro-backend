@@ -1,0 +1,443 @@
+# Alert rules. severity: critical = đánh thức người trực; warning = xem trong giờ làm việc;
+# info = chỉ hiện trên Grafana, không gửi thông báo (xem alertmanager.yml).
+# Mỗi alert có `runbook_url` trỏ tới mục tương ứng trong docs/observability.md.
+groups:
+  # Sẵn sàng / SLO
+  - name: jobportal_availability
+    rules:
+      - alert: ApiDown
+        expr: up{job="jobportal-api"} == 0
+        for: 2m
+        labels: { severity: critical, area: availability }
+        annotations:
+          summary: "API cannot be scraped ({{ $labels.instance }})"
+          description: "API cannot be scraped ({{ $labels.instance }})"
+          runbook_url: "docs/observability.md#apidown"
+
+      - alert: ApiHealthProbeFailing
+        expr: probe_success{job="blackbox-health"} == 0
+        for: 2m
+        labels: { severity: critical, area: availability }
+        annotations:
+          summary: "GET /health fails from the outside"
+          description: "Probe {{ $labels.instance }} is failing. If ApiDown is not firing, the issue lies with the network, proxy, or TLS."
+          runbook_url: "docs/observability.md#apihealthprobefailing"
+
+      - alert: ApiRestartLoop
+        expr: changes(jobportal_process_start_time_seconds{job="jobportal-api"}[15m]) > 2
+        labels: { severity: warning, area: availability }
+        annotations:
+          summary: "The API restarted {{ $value }} times within 15 minutes"
+          description: "Crash loop or OOM-kill. Check logs + Sentry around the time of the restart."
+          runbook_url: "docs/observability.md#apirestartloop"
+
+      # Burn-rate đa cửa sổ (Google SRE workbook). SLO = 99.5% request không 5xx
+      # → ngân sách lỗi 0.5% (0.005). 14.4x = cạn ngân sách 30 ngày trong ~2 ngày.
+      - alert: SloErrorBudgetFastBurn
+        expr: |
+          job:slo_errors:ratio_rate1h > (14.4 * 0.005)
+          and
+          job:slo_errors:ratio_rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: { severity: critical, area: slo }
+        annotations:
+          summary: "Rapid budget burn due to errors (>14.4x)"
+          description: "5xx rate (1h) = {{ $value | humanizePercentage }}. The monthly error budget is being depleted very quickly."
+          runbook_url: "docs/observability.md#sloerrorbudgetfastburn"
+
+      - alert: SloErrorBudgetSlowBurn
+        expr: |
+          job:slo_errors:ratio_rate6h > (6 * 0.005)
+          and
+          job:slo_errors:ratio_rate30m > (6 * 0.005)
+        for: 15m
+        labels: { severity: warning, area: slo }
+        annotations:
+          summary: "Burning through budget with a slow but sustainable approach (>6x)"
+          description: "5xx rate (6h) = {{ $value | humanizePercentage }}."
+          runbook_url: "docs/observability.md#sloerrorbudgetslowburn"
+
+      - alert: SloLatencyDegraded
+        expr: job:slo_latency_good:ratio_rate1h < 0.95 and job:http_requests:rate5m > 0.05
+        for: 15m
+        labels: { severity: warning, area: slo }
+        annotations:
+          summary: "Less than 95% of requests are completed within 500ms"
+          description: "Only {{ $value | humanizePercentage }} of requests in the last hour were faster than 500ms."
+          runbook_url: "docs/observability.md#slolatencydegraded"
+
+  # http
+  - name: jobportal_http
+    rules:
+      - alert: HttpRouteHighErrorRatio
+        expr: path:http_requests_5xx:ratio_rate5m > 0.10 and path:http_requests:rate5m > 0.05
+        for: 10m
+        labels: { severity: warning, area: http }
+        annotations:
+          summary: "{{ $labels.method }} {{ $labels.path }}: {{ $value | humanizePercentage }} request 5xx"
+          description: "A specific route may have a high error rate, even if the overall system is performing fine. Filter by `requestId` in Sentry or your logs."
+          runbook_url: "docs/observability.md#httproutehigherrorratio"
+
+      - alert: HttpLatencyP95High
+        expr: job:http_latency_seconds:p95_5m > 1 and job:http_requests:rate5m > 0.05
+        for: 10m
+        labels: { severity: warning, area: http }
+        annotations:
+          summary: "p95 latency {{ $value | humanizeDuration }} (>1s)"
+          runbook_url: "docs/observability.md#httplatencyp95high"
+
+      - alert: HttpLatencyP99Critical
+        expr: job:http_latency_seconds:p99_5m > 5 and job:http_requests:rate5m > 0.05
+        for: 10m
+        labels: { severity: critical, area: http }
+        annotations:
+          summary: "p99 latency {{ $value | humanizeDuration }} (>5s)"
+          description: "Approaching the `statement_timeout` (30s) / client timeout — many users are seeing the page hang."
+          runbook_url: "docs/observability.md#httplatencyp99critical"
+
+      - alert: HttpRouteSlow
+        expr: path:http_latency_seconds:p95_5m > 2 and path:http_requests:rate5m > 0.05
+        for: 15m
+        labels: { severity: warning, area: http }
+        annotations:
+          summary: "{{ $labels.method }} {{ $labels.path }} p95 = {{ $value | humanizeDuration }}"
+          runbook_url: "docs/observability.md#httprouteslow"
+
+      - alert: HttpTrafficDropped
+        expr: |
+          job:http_requests:rate5m < 0.2 * avg_over_time(job:http_requests:rate5m[1h] offset 1d)
+          and avg_over_time(job:http_requests:rate5m[1h] offset 1d) > 0.2
+        for: 15m
+        labels: { severity: warning, area: http }
+        annotations:
+          summary: "HTTP traffic has dropped to less than 20% of the same time yesterday"
+          description: "This may indicate an upstream issue (DNS/CDN/frontend) that does not necessarily generate 5xx errors."
+          runbook_url: "docs/observability.md#httptrafficdropped"
+
+      - alert: HttpInFlightHigh
+        expr: jobportal_http_requests_in_flight > 100
+        for: 5m
+        labels: { severity: warning, area: http }
+        annotations:
+          summary: "{{ $value }} requests are being processed concurrently"
+          description: "Requests are backing up - commonly caused by slow DB/Redis operations or a blocked event loop."
+          runbook_url: "docs/observability.md#httpinflighthigh"
+
+      - alert: HttpRateLimiting
+        expr: sum(rate(http_request_duration_seconds_count{job="jobportal-api",status_code="429"}[5m])) > 5
+        for: 10m
+        labels: { severity: warning, area: security }
+        annotations:
+          summary: "{{ $value | humanize }} req/s are being rate-limited (429)"
+          description: "This may indicate bot activity or an attack, or a rate limit threshold that is too restrictive for legitimate traffic."
+          runbook_url: "docs/observability.md#httpratelimiting"
+
+  #  Bảo mật / xác thực
+  - name: jobportal_auth
+    rules:
+      - alert: LoginFailureSpike
+        expr: sum(rate(jobportal_auth_events_total{event="login_failed"}[5m])) > 1
+        for: 5m
+        labels: { severity: warning, area: security }
+        annotations:
+          summary: "{{ $value | humanize }} failed login attempts per second"
+          description: "Potential credential stuffing or brute-force activity. Check the source IPs in the logs and tighten the authLimiter if necessary."
+          runbook_url: "docs/observability.md#loginfailurespike"
+
+      - alert: RefreshTokenFailures
+        expr: sum(rate(jobportal_auth_events_total{event="refresh_failed"}[10m])) > 1
+        for: 10m
+        labels: { severity: warning, area: auth }
+        annotations:
+          summary: "Repeated refresh token failures"
+          description: "Possible causes include lost Redis sessions, a changed JWT_REFRESH_SECRET, or a client stuck in a refresh retry loop."
+          runbook_url: "docs/observability.md#refreshtokenfailures"
+
+  # database
+  - name: jobportal_database
+    rules:
+      - alert: DbQueryErrors
+        expr: sum(rate(jobportal_db_query_errors_total[5m])) > 0.2
+        for: 5m
+        labels: { severity: critical, area: database }
+        annotations:
+          summary: "{{ $value | humanize }} SQL errors per second"
+          description: "Possible causes include lost database connections, deadlocks, statement timeouts, or unapplied migrations."
+          runbook_url: "docs/observability.md#dbqueryerrors"
+
+      - alert: DbQueryLatencyP95High
+        expr: job:db_query_seconds:p95_5m > 0.5
+        for: 10m
+        labels: { severity: warning, area: database }
+        annotations:
+          summary: "DB p95 = {{ $value | humanizeDuration }}"
+          runbook_url: "docs/observability.md#dbquerylatencyp95high"
+
+      - alert: DbSlowQueries
+        expr: sum(rate(jobportal_db_slow_queries_total[5m])) > 0.1
+        for: 10m
+        labels: { severity: warning, area: database }
+        annotations:
+          summary: "{{ $value | humanize }} slow queries per second (≥ DB_SLOW_QUERY_MS)"
+          description: "Find the WARN 'Slow query' log entries (which include a requestId), then run scripts/explain-analyze.sql."
+          runbook_url: "docs/observability.md#dbslowqueries"
+
+      - alert: NPlusOneSuspected
+        expr: sum by (route) (increase(jobportal_n_plus_one_suspects_total[1h])) > 20
+        labels: { severity: info, area: database }
+        annotations:
+          summary: "Potential N+1 query issue on {{ $labels.route }} ({{ $value }} requests/hour)"
+          runbook_url: "docs/observability.md#nplusonesuspected"
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels: { severity: critical, area: database }
+        annotations:
+          summary: "postgres-exporter is unable to connect to PostgreSQ"
+          runbook_url: "docs/observability.md#postgresdown"
+
+      - alert: PostgresConnectionsNearLimit
+        expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+        for: 10m
+        labels: { severity: warning, area: database }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of maximum PostgreSQL connections are in use."
+          runbook_url: "docs/observability.md#postgresconnectionsnearlimit"
+
+  # redis
+  - name: jobportal_redis
+    rules:
+      - alert: RedisCommandErrors
+        expr: sum(rate(jobportal_redis_command_errors_total[5m])) > 0.1
+        for: 5m
+        labels: { severity: critical, area: redis }
+        annotations:
+          summary: "{{ $value | humanize }} Redis command errors per second"
+          description: "Redis stores token blacklists, sessions, and idempotency records. Redis failures can disrupt login and token refresh operations."
+          runbook_url: "docs/observability.md#rediscommanderrors"
+
+      - alert: RedisLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(jobportal_redis_command_duration_seconds_bucket[5m]))) > 0.1
+        for: 10m
+        labels: { severity: warning, area: redis }
+        annotations:
+          summary: "Redis p95 command latency = {{ $value | humanizeDuration }}"
+          runbook_url: "docs/observability.md#redislatencyhigh"
+
+      - alert: UserCacheHitRatioLow
+        expr: prefix:redis_cache_hit:ratio_rate15m{prefix="auth:userCache"} < 0.5
+        for: 30m
+        labels: { severity: info, area: redis }
+        annotations:
+          summary: "auth:userCache hit ratio {{ $value | humanizePercentage }}"
+          description: "Every authentication request is falling back to the database. (Cache misses for the auth:blacklist prefix are expected and are not measured.)"
+          runbook_url: "docs/observability.md#usercachehitratiolow"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels: { severity: critical, area: redis }
+        annotations:
+          summary: "redis-exporter is unable to connect to Redis"
+          runbook_url: "docs/observability.md#redisdown"
+
+  # RabbitMQ / Outbox
+  - name: jobportal_async
+    rules:
+      - alert: MqDisconnected
+        expr: jobportal_mq_connected == 0
+        for: 2m
+        labels: { severity: critical, area: queue }
+        annotations:
+          summary: "API has lost its connection to RabbitMQ"
+          description: "Messages are accumulating in the outbox table, and real-time delivery has stopped. Check CloudAMQP (quota limits or instance hibernation)."
+          runbook_url: "docs/observability.md#mqdisconnected"
+
+      - alert: MqReconnectStorm
+        expr: increase(jobportal_mq_reconnect_attempts_total[10m]) > 5
+        labels: { severity: warning, area: queue }
+        annotations:
+          summary: "{{ $value }} RabbitMQ reconnection attempts in the last 10 minutes"
+          runbook_url: "docs/observability.md#mqreconnectstorm"
+
+      - alert: MqPublishFailures
+        expr: sum(rate(jobportal_mq_publish_total{result=~"error|not_ready|backpressure"}[5m])) > 0
+        for: 5m
+        labels: { severity: warning, area: queue }
+        annotations:
+          summary: "RabbitMQ message publishing failures ({{ $value | humanize }} per second)"
+          runbook_url: "docs/observability.md#mqpublishfailures"
+
+      - alert: MqMessageDeadLettered
+        expr: sum by (queue) (increase(jobportal_mq_messages_total{result="dead"}[15m])) > 0
+        labels: { severity: critical, area: queue }
+        annotations:
+          summary: "Messages in queue {{ $labels.queue }} have been sent to the DLQ"
+          description: "Poison message detected — check the '[MQ] ... exceeded 5 attempts' logs and Sentry. Fix the underlying issue, then manually replay the messages."
+          runbook_url: "docs/observability.md#mqmessagedeadlettered"
+
+      - alert: MqRetriesHigh
+        expr: sum by (queue) (rate(jobportal_mq_messages_total{result="retry"}[10m])) > 0.5
+        for: 10m
+        labels: { severity: warning, area: queue }
+        annotations:
+          summary: "Queue {{ $labels.queue }} is experiencing repeated message retries"
+          runbook_url: "docs/observability.md#mqretrieshigh"
+
+      - alert: RabbitMqDeadLetterQueueNotEmpty
+        expr: rabbitmq_queue_messages_ready{queue="dead-letter.queue"} > 0
+        for: 5m
+        labels: { severity: warning, area: queue }
+        annotations:
+          summary: "{{ $value }} unprocessed messages remain in the dead-letter queue"
+          runbook_url: "docs/observability.md#rabbitmqdeadletterqueuenotempty"
+
+      - alert: OutboxBacklogHigh
+        expr: jobportal_outbox_pending > 100
+        for: 5m
+        labels: { severity: warning, area: outbox }
+        annotations:
+          summary: "{{ $value }} outbox events are awaiting publication"
+          runbook_url: "docs/observability.md#outboxbackloghigh"
+
+      - alert: OutboxBacklogCritical
+        expr: jobportal_outbox_pending > 1000
+        for: 5m
+        labels: { severity: critical, area: outbox }
+        annotations:
+          summary: "Outbox backlog has reached {{ $value }} events - the relay cannot keep up"
+          runbook_url: "docs/observability.md#outboxbacklogcritical"
+
+      - alert: OutboxStuck
+        expr: |
+          jobportal_outbox_pending > 0
+          and on()
+          (sum(rate(jobportal_outbox_events_total{result="published"}[10m])) or vector(0)) == 0
+        for: 10m
+        labels: { severity: critical, area: outbox }
+        annotations:
+          summary: "Outbox has pending events, but no events have been published in the last 10 minutes"
+          description: "The outboxRelay may have stopped or MQ may be unavailable. Group messages are NOT being delivered in real time."
+          runbook_url: "docs/observability.md#outboxstuck"
+
+      - alert: OutboxDeadEvents
+        expr: jobportal_outbox_dead > 0
+        for: 1m
+        labels: { severity: critical, area: outbox }
+        annotations:
+          summary: "{{ $value }} outbox events have exhausted all retry attempts and been marked as dead"
+          description: "Manual intervention is required: inspect the outbox_events table, fix the underlying issue, and reset the event status."
+          runbook_url: "docs/observability.md#outboxdeadevents"
+
+  - name: jobportal_external
+    rules:
+      - alert: ExternalCallFailing
+        expr: service:external_call_errors:ratio_rate5m > 0.2 and sum by (service) (rate(jobportal_external_call_duration_seconds_count[5m])) > 0.02
+        for: 10m
+        labels: { severity: warning, area: external }
+        annotations:
+          summary: "{{ $labels.service }}: {{ $value | humanizePercentage }} of external calls are failing or timing out"
+          runbook_url: "docs/observability.md#externalcallfailing"
+
+      - alert: ExternalCallSlow
+        expr: service:external_call_seconds:p95_5m > 10
+        for: 10m
+        labels: { severity: warning, area: external }
+        annotations:
+          summary: "{{ $labels.service }} p95 latency = {{ $value | humanizeDuration }}"
+          runbook_url: "docs/observability.md#externalcallslow"
+
+  # Realtime / Runtime
+  - name: jobportal_runtime
+    rules:
+      - alert: WebSocketConnectionsDropped
+        expr: jobportal_ws_connections == 0 and max_over_time(jobportal_ws_connections[1h]) > 10
+        for: 5m
+        labels: { severity: warning, area: realtime }
+        annotations:
+          summary: "All Socket.IO connections have been lost (previously >10)"
+          runbook_url: "docs/observability.md#websocketconnectionsdropped"
+
+      - alert: EventLoopLagHigh
+        expr: jobportal_nodejs_eventloop_lag_p99_seconds > 0.5
+        for: 5m
+        labels: { severity: warning, area: runtime }
+        annotations:
+          summary: "Event loop p99 lag = {{ $value | humanizeDuration }}"
+          description: "A CPU-intensive or synchronous task may be blocking the event loop (e.g., large JSON payloads, bcrypt operations, PDF parsing)."
+          runbook_url: "docs/observability.md#eventlooplaghigh"
+
+      - alert: HeapUsageHigh
+        expr: jobportal_nodejs_heap_size_used_bytes / jobportal_nodejs_heap_size_total_bytes > 0.9
+        for: 15m
+        labels: { severity: warning, area: runtime }
+        annotations:
+          summary: "Heap usage is at {{ $value | humanizePercentage }} - possible memory leak"
+          runbook_url: "docs/observability.md#heapusagehigh"
+
+      - alert: MemoryNearLimit
+        # Ngưỡng 400MB phù hợp gói 512MB. Đổi theo RAM thật của instance.
+        expr: jobportal_process_resident_memory_bytes > 400 * 1024 * 1024
+        for: 10m
+        labels: { severity: warning, area: runtime }
+        annotations:
+          summary: "RSS = {{ $value | humanize1024 }}B"
+          runbook_url: "docs/observability.md#memorynearlimit"
+
+      - alert: CpuSaturated
+        expr: rate(jobportal_process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels: { severity: warning, area: runtime }
+        annotations:
+          summary: "CPU usage is at {{ $value | humanizePercentage }} of one core"
+          runbook_url: "docs/observability.md#cpusaturated"
+
+      - alert: FileDescriptorsNearLimit
+        expr: jobportal_process_open_fds / jobportal_process_max_fds > 0.8
+        for: 10m
+        labels: { severity: warning, area: runtime }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of available file descriptors are in use"
+          runbook_url: "docs/observability.md#filedescriptorsnearlimit"
+
+  # Monitoring Infrastructure
+  - name: jobportal_observability
+    rules:
+      # Luôn firing. Nếu KHÔNG còn nhận được tin này (heartbeat) = pipeline cảnh báo hỏng.
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none, area: meta }
+        annotations:
+          summary: "Alerting pipeline is operational (heartbeat)"
+
+      - alert: MonitoringTargetDown
+        expr: up{job=~"otel-collector|alertmanager|tempo|postgres|redis|rabbitmq"} == 0
+        for: 5m
+        labels: { severity: warning, area: meta }
+        annotations:
+          summary: "Failed to scrape {{ $labels.job }} ({{ $labels.instance }})"
+          runbook_url: "docs/observability.md#monitoringtargetdown"
+
+      - alert: OtelCollectorDroppingSpans
+        expr: sum(rate(otelcol_exporter_send_failed_spans_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning, area: meta }
+        annotations:
+          summary: "OTel Collector is failing to export spans to Tempo"
+          runbook_url: "docs/observability.md#otelcollectordroppingspans"
+
+      - alert: AlertmanagerNotificationsFailing
+        expr: sum by (integration) (rate(alertmanager_notifications_failed_total[10m])) > 0
+        for: 10m
+        labels: { severity: warning, area: meta }
+        annotations:
+          summary: "Alertmanager failed to send notifications via {{ $labels.integration }} — alerts may not be delivered"
+          runbook_url: "docs/observability.md#alertmanagernotificationsfailing"
+
+      - alert: PrometheusRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels: { severity: warning, area: meta }
+        annotations:
+          summary: "Prometheus rule evaluation is failing"
+          runbook_url: "docs/observability.md#prometheusruleevaluationfailing"

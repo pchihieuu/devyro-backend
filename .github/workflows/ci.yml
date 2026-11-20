@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: OpenAPI contract
+        run: |
+          npm run openapi:generate
+          git --no-pager diff --stat -- docs/openapi/openapi.json
+          git --no-pager diff -- docs/openapi/openapi.json | head -80
+          git diff --quiet -- docs/openapi/openapi.json || { echo "::error::openapi.json differs from generated output"; exit 1; }
+
+  alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate & unit-test Prometheus rules
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/prometheus:/p:ro" prom/prometheus:v2.51.2 check rules /p/rules/alerts.rules.yml /p/rules/recording.rules.yml
+          docker run --rm --entrypoint promtool -v "$PWD/prometheus:/p:ro" prom/prometheus:v2.51.2 test rules /p/tests/alerts.test.yml
+      - name: Validate Alertmanager config
+        run: |
+          mkdir -p alertmanager/secrets && echo -n ci > alertmanager/secrets/telegram_bot_token
+          docker run --rm --entrypoint amtool -v "$PWD/alertmanager:/etc/alertmanager:ro" prom/alertmanager:v0.27.0 check-config /etc/alertmanager/alertmanager.yml
+      - name: Validate OTel Collector config
+        run: docker run --rm -v "$PWD/otel:/c:ro" otel/opentelemetry-collector-contrib:0.111.0 validate --config=/c/otel-collector.yml

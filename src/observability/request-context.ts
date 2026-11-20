@@ -1,8 +1,10 @@
-import { AsyncLocalStorage } from "async_hooks";
 import { NextFunction, Request, Response } from "express";
 import { logger } from "../utils/logger";
 import { dbQueriesPerRequest, nPlusOneSuspects } from "./metrics";
 import { currentTraceId } from "./tracing";
+import { RequestStore, requestStore } from "./als";
+
+export { requestStore, getRequestId } from "./als";
 
 /**
  * Context theo từng HTTP request (AsyncLocalStorage) để:
@@ -22,18 +24,6 @@ const nPlusOneThreshold = () => envInt("N_PLUS_ONE_THRESHOLD", 10);
 
 const MAX_TRACKED_FINGERPRINTS = 200;
 const MAX_FINGERPRINT_LENGTH = 300;
-
-interface RequestStore {
-  requestId?: string;
-  traceId?: string;
-  queryCount: number;
-  fingerprints: Map<string, number>;
-}
-
-export const requestStore = new AsyncLocalStorage<RequestStore>();
-
-export const getRequestId = (): string | undefined =>
-  requestStore.getStore()?.requestId;
 
 /** Ghi nhận 1 câu SQL vào request hiện tại (no-op ngoài HTTP request: worker, cron...). */
 export const recordQuery = (sql: string): void => {

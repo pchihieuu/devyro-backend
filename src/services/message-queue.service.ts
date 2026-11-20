@@ -2,6 +2,8 @@ import amqplib, { Channel, ChannelModel } from "amqplib";
 import { config } from "./../config/env.config";
 import { logger } from "../utils/logger";
 import { Gauge, Counter } from "prom-client";
+import { mqHandlerDuration, mqMessages, mqPublish } from "../observability/metrics";
+import { captureError } from "../observability/sentry";
 
 export enum QueueName {
   GROUP_MESSAGE = "group.message",
@@ -30,6 +32,8 @@ const DLQ_NAME = "dead-letter.queue";
 
 /** Delivery attempts before we give up and route a message to the DLQ instead of requeueing. */
 const MAX_DELIVERY_ATTEMPTS = 5;
+/** Header đếm số lần xử lý thất bại — đi cùng message nên không mất khi restart và không phụ thuộc deliveryTag. */
+const ATTEMPT_HEADER = "x-attempts";
 
 export interface QueueMessage<T = unknown> {
   type: string;
@@ -345,6 +349,7 @@ export class MessageQueueService {
         "[MQ] publish channel not ready, message dropped:",
         routingKey
       );
+      mqPublish.inc({ result: "not_ready" });
       return false;
     }
 
@@ -369,13 +374,17 @@ export class MessageQueueService {
         console.warn(
           `[MQ] publish returned false for ${routingKey} — channel buffer full`
         );
+        mqPublish.inc({ result: "backpressure" });
       } else {
         console.log(`[MQ] published ${routingKey} OK`);
+        mqPublish.inc({ result: "ok" });
       }
 
       return ok;
     } catch (error) {
       console.error("[MQ] publish error:", error);
+      mqPublish.inc({ result: "error" });
+      captureError(error);
       return false;
     } finally {
       this.publishMutex.release();
@@ -383,19 +392,15 @@ export class MessageQueueService {
   }
 
   /**
-   * Local (in-process) redelivery counter keyed by messageId, capped at
-   * MAX_DELIVERY_ATTEMPTS. We deliberately do NOT use ch.nack(msg, false,
-   * true) (redeliver-in-place) for retries: a poison message would then
-   * spin at the head of the queue forever, blocking every message behind
-   * it (head-of-line blocking) since prefetch is small. Instead we retry
-   * a bounded number of times in-process with a short delay, and only
-   * nack(requeue=false) — which the queue's x-dead-letter-exchange routes
-   * to the DLQ — once attempts are exhausted. This counter resets on
-   * worker restart, which is an accepted tradeoff: worst case a message
-   * gets a few extra retries after a deploy, never fewer.
+   * Retry có giới hạn, KHÔNG dùng nack(requeue=true) (poison message sẽ chặn
+   * đầu hàng đợi). Message lỗi được ack rồi publish lại sau backoff, và số lần
+   * thử nằm trong header `x-attempts` của chính message.
+   *
+   * BUG FIX: bản cũ đếm theo `messageId || deliveryTag`. Publisher không đặt
+   * messageId, còn deliveryTag đổi sau MỖI lần publish lại → bộ đếm luôn = 1,
+   * message lỗi không bao giờ tới DLQ (retry vô hạn mỗi ~2s) và Map đếm rò rỉ
+   * theo từng lần lỗi. Header đi cùng message nên đếm đúng, sống qua restart.
    */
-  private attemptCounts = new Map<string, number>();
-
   async consume<T>(
     queue: QueueName,
     handler: (msg: QueueMessage<T>) => Promise<void>
@@ -404,45 +409,46 @@ export class MessageQueueService {
 
     await ch.consume(queue, async (msg) => {
       if (!msg) return;
-      const messageId =
-        msg.properties.messageId || msg.fields.deliveryTag.toString();
+      const stop = mqHandlerDuration.startTimer({ queue });
 
       try {
         const content: QueueMessage<T> = JSON.parse(msg.content.toString());
         await handler(content);
         ch.ack(msg);
-        this.attemptCounts.delete(messageId);
+        mqMessages.inc({ queue, result: "ok" });
       } catch (error) {
-        const attempts = (this.attemptCounts.get(messageId) ?? 0) + 1;
+        const previous = Number(msg.properties.headers?.[ATTEMPT_HEADER] ?? 0);
+        const attempts = (Number.isFinite(previous) ? previous : 0) + 1;
         logger.error(`[MQ] Error processing message from ${queue}`, {
           error: error instanceof Error ? error.message : error,
           attempts,
         });
 
-        if (attempts >= MAX_DELIVERY_ATTEMPTS) {
-          this.attemptCounts.delete(messageId);
-          // Give up — requeue=false routes to the queue's
-          // x-dead-letter-exchange instead of discarding the message.
+        if (attempts >= MAX_DELIVERY_ATTEMPTS || !this.publishChannel) {
+          // Hết lượt (hoặc không còn kênh để publish lại): requeue=false →
+          // RabbitMQ chuyển sang DLQ theo x-dead-letter-exchange.
           logger.error(
             `[MQ] ${queue} message exceeded ${MAX_DELIVERY_ATTEMPTS} attempts, routing to DLQ`
           );
+          mqMessages.inc({ queue, result: "dead" });
+          captureError(error);
           ch.nack(msg, false, false);
         } else {
-          this.attemptCounts.set(messageId, attempts);
-          ch.ack(msg); // remove from the live queue…
+          mqMessages.inc({ queue, result: "retry" });
+          ch.ack(msg); // gỡ khỏi hàng đợi chính…
           setTimeout(
             () => {
-              // …and re-publish for another attempt after a short backoff,
-              // instead of an in-place requeue that would block the queue.
-              this.publishChannel?.sendToQueue(
-                queue,
-                msg.content,
-                msg.properties
-              );
+              // …rồi publish lại sau backoff, kèm bộ đếm mới.
+              this.publishChannel?.sendToQueue(queue, msg.content, {
+                ...msg.properties,
+                headers: { ...msg.properties.headers, [ATTEMPT_HEADER]: attempts },
+              });
             },
             Math.min(1000 * 2 ** attempts, 30_000)
           );
         }
+      } finally {
+        stop();
       }
     });
   }

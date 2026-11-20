@@ -1,3 +1,4 @@
+import { authEvents } from "../observability/metrics";
 import {
   generateTokens,
   verifyRefreshToken,
@@ -94,6 +95,7 @@ export class AuthService {
       role,
     });
 
+    authEvents.inc({ event: "register" });
     this.sendWelcomeEmailAsync(user.email, user.name);
 
     return this.buildAuthResponse(user, deviceInfo, ipAddress);
@@ -103,15 +105,21 @@ export class AuthService {
     const { email, password, deviceInfo, ipAddress } = data;
 
     const user = await this.authRepo.findUserByEmailForLogin(email);
-    if (!user) throw new UnauthorizedError("Invalid email or password");
+    if (!user) {
+      authEvents.inc({ event: "login_failed" });
+      throw new UnauthorizedError("Invalid email or password");
+    }
 
     const isPasswordValid = await PasswordUtils.compare(
       password,
       user.password
     );
-    if (!isPasswordValid)
+    if (!isPasswordValid) {
+      authEvents.inc({ event: "login_failed" });
       throw new UnauthorizedError("Invalid email or password");
+    }
 
+    authEvents.inc({ event: "login_success" });
     return this.buildAuthResponse(user, deviceInfo, ipAddress);
   }
 

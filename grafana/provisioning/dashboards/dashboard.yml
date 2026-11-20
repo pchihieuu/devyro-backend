@@ -11,3 +11,13 @@ providers:
     # editable: true
     options:
       path: /etc/grafana/provisioning/dashboards
+
+  - name: "jobportal-dashboards"
+    orgId: 1
+    folder: "Job Portal"
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

@@ -60,9 +60,12 @@ const parseEntry = (raw: string | null): StoredEntry | null => {
   }
 };
 
-export const idempotency =
-  (options: { ttlSeconds?: number } = {}) =>
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+/** Đánh dấu handler để OpenAPI generator tự thêm header Idempotency-Key. */
+export const IDEMPOTENT = "__jobportalIdempotent";
+
+export const idempotency = (options: { ttlSeconds?: number } = {}) =>
+  Object.assign(
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const rawKey = req.header(HEADER);
     if (!rawKey) return next();
 
@@ -145,4 +148,6 @@ export const idempotency =
     };
 
     next();
-  };
+    },
+    { [IDEMPOTENT]: true as const }
+  );

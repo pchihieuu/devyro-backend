@@ -1,3 +1,4 @@
+import { markAuth } from "../openapi/markers";
 import { Request, Response, NextFunction } from "express";
 import {
   AuthRejection,
@@ -81,3 +82,7 @@ export const optionalAuth = async (
 
   next();
 };
+
+// Cho OpenAPI generator (src/openapi/introspect.ts) — xem openapi/markers.ts.
+markAuth(protect, "required");
+markAuth(optionalAuth, "optional");

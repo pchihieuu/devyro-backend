@@ -1,3 +1,4 @@
+import { authEvents } from "../observability/metrics";
 import { Request, Response } from "express";
 import { authService } from "../services/auth.service";
 import { uploadService } from "../services/upload.service";
@@ -126,6 +127,7 @@ export const refreshToken = asyncHandler(
         "Token refreshed successfully"
       );
     } catch (error) {
+      authEvents.inc({ event: "refresh_failed" });
       clearRefreshTokenCookie(res);
       throw error;
     }

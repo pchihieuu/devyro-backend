@@ -1,0 +1,44 @@
+global:
+  resolve_timeout: 5m
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: telegram
+  group_by: [alertname, area]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Heartbeat: không gửi Telegram. Nối tới dịch vụ dead-man's-switch (healthchecks.io...) nếu muốn
+    # biết khi CHÍNH pipeline cảnh báo chết (xem docs/observability.md).
+    - matchers: [alertname="Watchdog"]
+      receiver: "null"
+      repeat_interval: 1m
+    # info: chỉ xem trên Grafana.
+    - matchers: [severity="info"]
+      receiver: "null"
+    - matchers: [severity="critical"]
+      receiver: telegram
+      group_wait: 10s
+      repeat_interval: 1h
+
+inhibit_rules:
+  # API chết → bỏ qua cảnh báo phụ thuộc (latency, queue, outbox...). Giữ lại ApiHealthProbeFailing/ApiDown.
+  - source_matchers: [alertname="ApiDown"]
+    target_matchers: [area=~"http|slo|database|redis|queue|outbox|realtime|runtime|external|auth|security"]
+  # critical của cùng alertname đang bắn thì bỏ warning trùng tên.
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname, area]
+
+receivers:
+  - name: "null"
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/secrets/telegram_bot_token
+        chat_id: 6365640061        
+        parse_mode: HTML
+        send_resolved: true
+        message: '{{ template "telegram.message" . }}'

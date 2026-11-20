@@ -76,7 +76,19 @@ interface TimeoutConfig {
   emailMs: number;
 }
 
+/**
+ * Tài liệu OpenAPI (Swagger UI). Mặc định BẬT ở dev, TẮT ở production trừ khi
+ * DOCS_ENABLED=true; nên kèm DOCS_BASIC_AUTH="user:pass" khi bật ở production.
+ */
+interface DocsConfig {
+  enabled: boolean;
+  basicAuth?: string;
+  /** Origin công khai của API, dùng làm `servers[0].url` trong tài liệu. */
+  publicUrl?: string;
+}
+
 interface AppConfig {
+  docs: DocsConfig;
   timeouts: TimeoutConfig;
   database: DatabaseConfig;
   jwt: JwtConfig;
@@ -126,6 +138,14 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
 };
 
 export const config: AppConfig = {
+  docs: {
+    enabled:
+      process.env.DOCS_ENABLED !== undefined && process.env.DOCS_ENABLED !== ""
+        ? process.env.DOCS_ENABLED === "true"
+        : (process.env.NODE_ENV || "development") !== "production",
+    basicAuth: process.env.DOCS_BASIC_AUTH || undefined,
+    publicUrl: process.env.API_PUBLIC_URL || undefined,
+  },
   timeouts: {
     cloudinaryMs: positiveInt(process.env.CLOUDINARY_TIMEOUT_MS, 60_000),
     emailMs: positiveInt(process.env.EMAIL_TIMEOUT_MS, 15_000),

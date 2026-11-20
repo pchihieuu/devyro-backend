@@ -3,15 +3,25 @@ import { Request, Response, NextFunction } from "express";
 import { ZodSchema, ZodError, ZodIssue } from "zod";
 import { ValidationError, FieldError } from "../utils/errors";
 
+/**
+ * Gắn schema vào handler để OpenAPI generator (src/openapi/introspect.ts) đọc
+ * ngược lại được params/query/body từ chính router — tài liệu không thể lệch
+ * khỏi validator thật.
+ */
+export const VALIDATION_SCHEMA = "__jobportalValidationSchema";
+
 interface ValidateData {
   body?: any;
   query?: any;
   params?: any;
 }
 
-export const validate =
-  (schema: ZodSchema) =>
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const validate = (schema: ZodSchema) => {
+  const handler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const validated = (await schema.parseAsync({
         body: req.body,
@@ -33,8 +43,7 @@ export const validate =
           // Bỏ prefix "body."/"query."/"params." — chỉ giữ tên field thật
           // (vd "hourlyRateMax" thay vì "body.hourlyRateMax") để khớp với
           // tên field trên form FE, tránh nhầm lẫn khi hiển thị/mapping lỗi.
-          field:
-            err.path.length > 1 ? err.path.slice(1).join(".") : null,
+          field: err.path.length > 1 ? err.path.slice(1).join(".") : null,
           message: err.message,
         }));
 
@@ -48,3 +57,5 @@ export const validate =
       next(error);
     }
   };
+  return Object.assign(handler, { [VALIDATION_SCHEMA]: schema });
+};
